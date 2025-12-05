@@ -1,5 +1,4 @@
 import { Instagram, Youtube, Music2, MessageSquare, DollarSign, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface Activity {
   id: string;
@@ -48,39 +47,37 @@ const activities: Activity[] = [
 ];
 
 const iconConfig = {
-  instagram: { icon: Instagram, bg: "bg-gradient-to-br from-pink-500 to-orange-400" },
-  youtube: { icon: Youtube, bg: "bg-red-500" },
-  tiktok: { icon: Music2, bg: "bg-foreground" },
-  collab: { icon: MessageSquare, bg: "bg-primary" },
-  payment: { icon: DollarSign, bg: "bg-emerald-500" },
-  milestone: { icon: TrendingUp, bg: "bg-amber-500" },
+  instagram: Instagram,
+  youtube: Youtube,
+  tiktok: Music2,
+  collab: MessageSquare,
+  payment: DollarSign,
+  milestone: TrendingUp,
 };
 
 export function RecentActivity() {
   return (
-    <div className="bg-card rounded-2xl border border-border p-6">
+    <div className="glass-card p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-foreground">Recent Activity</h3>
-        <button className="text-sm text-primary hover:underline">View All</button>
+        <h3 className="text-base font-medium text-foreground">Recent Activity</h3>
+        <button className="text-sm text-muted-foreground hover:text-foreground transition-colors">View All</button>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {activities.map((activity, index) => {
-          const { icon: Icon, bg } = iconConfig[activity.type];
+          const Icon = iconConfig[activity.type];
           return (
             <div
               key={activity.id}
-              className={cn(
-                "flex items-start gap-4 animate-fade-in",
-              )}
-              style={{ animationDelay: `${index * 100}ms` }}
+              className="flex items-start gap-4 p-3 rounded-xl hover:bg-accent/30 transition-all duration-300 opacity-0 animate-in"
+              style={{ animationDelay: `${index * 80}ms` }}
             >
-              <div className={cn("p-2 rounded-xl text-white", bg)}>
+              <div className="p-2 rounded-lg bg-secondary text-foreground">
                 <Icon className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">{activity.title}</p>
-                <p className="text-sm text-muted-foreground truncate">{activity.description}</p>
+                <p className="text-xs text-muted-foreground truncate">{activity.description}</p>
               </div>
               <p className="text-xs text-muted-foreground whitespace-nowrap">{activity.time}</p>
             </div>

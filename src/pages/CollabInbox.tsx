@@ -149,7 +149,7 @@ export default function CollabInbox() {
               <Filter className="w-4 h-4" />
               Sort by Value
             </Button>
-            <Button variant="gradient" className="gap-2">
+            <Button variant="default" className="gap-2">
               <Sparkles className="w-4 h-4" />
               AI Analyze All
             </Button>
@@ -351,7 +351,7 @@ export default function CollabInbox() {
                 {/* Actions */}
                 <div className="p-6 border-t border-border">
                   <div className="flex gap-3">
-                    <Button variant="gradient" className="flex-1 gap-2">
+                    <Button variant="default" className="flex-1 gap-2">
                       <CheckCircle2 className="w-4 h-4" />
                       Accept & Reply
                     </Button>

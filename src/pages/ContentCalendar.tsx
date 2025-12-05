@@ -95,7 +95,7 @@ export default function ContentCalendar() {
               <Download className="w-4 h-4" />
               Export
             </Button>
-            <Button variant="gradient" className="gap-2" onClick={() => setShowGenerator(true)}>
+            <Button variant="default" className="gap-2" onClick={() => setShowGenerator(true)}>
               <Sparkles className="w-4 h-4" />
               AI Generate 30-Day Plan
             </Button>
@@ -157,7 +157,7 @@ export default function ContentCalendar() {
                 <Button variant="outline" className="flex-1" onClick={() => setShowGenerator(false)}>
                   Cancel
                 </Button>
-                <Button variant="gradient" className="flex-1 gap-2">
+                <Button variant="default" className="flex-1 gap-2">
                   <Sparkles className="w-4 h-4" />
                   Generate Plan
                 </Button>

@@ -12,7 +12,6 @@ import {
   Settings,
   ChevronLeft,
   Sparkles,
-  Zap,
 } from "lucide-react";
 
 const navigation = [
@@ -32,31 +31,28 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out",
-        collapsed ? "w-20" : "w-64"
+        "fixed left-0 top-0 z-40 h-screen bg-sidebar/80 backdrop-blur-xl border-r border-sidebar-border transition-all duration-500 ease-out",
+        collapsed ? "w-[72px]" : "w-64"
       )}
     >
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
           <Link to="/" className="flex items-center gap-3">
-            <div className="relative">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-                <Zap className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full animate-pulse" />
+            <div className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center transition-transform duration-300 hover:scale-105">
+              <span className="text-background font-semibold text-sm">C</span>
             </div>
             {!collapsed && (
-              <span className="text-lg font-semibold text-foreground">CreatorOS</span>
+              <span className="text-base font-semibold text-foreground tracking-tight">CreatorOS</span>
             )}
           </Link>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-2 rounded-lg hover:bg-sidebar-accent transition-colors"
+            className="p-2 rounded-lg hover:bg-sidebar-accent transition-all duration-300"
           >
             <ChevronLeft
               className={cn(
-                "w-4 h-4 text-sidebar-foreground transition-transform duration-300",
+                "w-4 h-4 text-sidebar-foreground transition-transform duration-500",
                 collapsed && "rotate-180"
               )}
             />
@@ -65,20 +61,21 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-          {navigation.map((item) => {
+          {navigation.map((item, index) => {
             const isActive = location.pathname === item.href;
             return (
               <Link
                 key={item.name}
                 to={item.href}
                 className={cn(
-                  "nav-item",
+                  "nav-item opacity-0 animate-in",
                   isActive && "nav-item-active",
-                  collapsed && "justify-center px-3"
+                  collapsed && "justify-center px-2"
                 )}
+                style={{ animationDelay: `${index * 40}ms` }}
               >
-                <item.icon className={cn("w-5 h-5 flex-shrink-0", isActive && "text-primary")} />
-                {!collapsed && <span>{item.name}</span>}
+                <item.icon className={cn("w-[18px] h-[18px] flex-shrink-0", isActive && "text-foreground")} />
+                {!collapsed && <span className="text-sm">{item.name}</span>}
               </Link>
             );
           })}
@@ -87,15 +84,15 @@ export function Sidebar() {
         {/* Pro Badge */}
         {!collapsed && (
           <div className="p-4">
-            <div className="rounded-2xl gradient-primary p-4 text-primary-foreground">
+            <div className="glass-card p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-5 h-5" />
-                <span className="font-semibold">Upgrade to Pro</span>
+                <Sparkles className="w-4 h-4 text-foreground" />
+                <span className="text-sm font-medium text-foreground">Upgrade to Pro</span>
               </div>
-              <p className="text-sm opacity-90 mb-3">
-                Unlock AI-powered features and unlimited content generation.
+              <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                Unlock AI-powered features and unlimited generation.
               </p>
-              <button className="w-full py-2 bg-primary-foreground/20 hover:bg-primary-foreground/30 rounded-xl text-sm font-medium transition-colors">
+              <button className="w-full py-2 bg-foreground text-background rounded-lg text-xs font-medium transition-all duration-300 hover:opacity-90 active:scale-[0.98]">
                 Learn More
               </button>
             </div>
@@ -109,11 +106,11 @@ export function Sidebar() {
             className={cn(
               "nav-item",
               location.pathname === "/settings" && "nav-item-active",
-              collapsed && "justify-center px-3"
+              collapsed && "justify-center px-2"
             )}
           >
-            <Settings className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>Settings</span>}
+            <Settings className="w-[18px] h-[18px] flex-shrink-0" />
+            {!collapsed && <span className="text-sm">Settings</span>}
           </Link>
         </div>
       </div>

@@ -142,7 +142,7 @@ export default function Settings() {
                 Unlock unlimited AI generations, advanced analytics, and priority support.
               </p>
             </div>
-            <Button variant="gradient">Upgrade Now</Button>
+            <Button variant="default">Upgrade Now</Button>
           </div>
         </div>
 
