@@ -108,7 +108,7 @@ export default function AutoReScript() {
               />
             </div>
             <Button 
-              variant="gradient" 
+              variant="default"
               size="lg" 
               className="h-14 px-8 gap-2"
               onClick={handleGenerate}

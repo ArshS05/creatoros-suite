@@ -109,7 +109,7 @@ export default function WebsiteBuilder() {
               />
             </div>
             <Button 
-              variant="gradient" 
+              variant="default"
               size="lg" 
               className="h-14 px-8 gap-2 w-full md:w-auto"
               onClick={handleBuild}
@@ -328,7 +328,7 @@ export default function WebsiteBuilder() {
 
               {/* Actions */}
               <div className="space-y-2">
-                <Button variant="gradient" className="w-full gap-2">
+                <Button variant="default" className="w-full gap-2">
                   <CheckCircle2 className="w-4 h-4" />
                   Publish Website
                 </Button>

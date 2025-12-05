@@ -120,7 +120,7 @@ export default function IdeaScrapbook() {
               <Plus className="w-4 h-4" />
               Add Idea
             </Button>
-            <Button variant="gradient" className="gap-2">
+            <Button variant="default" className="gap-2">
               <Sparkles className="w-4 h-4" />
               AI Organize
             </Button>
@@ -180,7 +180,7 @@ export default function IdeaScrapbook() {
                 <Button variant="outline" className="flex-1" onClick={() => setShowUpload(false)}>
                   Cancel
                 </Button>
-                <Button variant="gradient" className="flex-1">
+                <Button variant="default" className="flex-1">
                   Save Idea
                 </Button>
               </div>

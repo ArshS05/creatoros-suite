@@ -13,37 +13,34 @@ export function AppLayout({ children }: AppLayoutProps) {
       <Sidebar />
       
       {/* Main Content */}
-      <div className="pl-64 transition-all duration-300">
+      <div className="pl-64 transition-all duration-500">
         {/* Top Header */}
-        <header className="sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-xl border-b border-border">
+        <header className="sticky top-0 z-30 h-16 bg-background/60 backdrop-blur-xl border-b border-border">
           <div className="flex h-full items-center justify-between px-6">
             {/* Search */}
-            <div className="flex items-center gap-4 flex-1 max-w-xl">
+            <div className="flex items-center gap-4 flex-1 max-w-md">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="Search anything..."
-                  className="w-full h-10 pl-10 pr-4 rounded-xl bg-secondary border-none text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="Search..."
+                  className="input-field w-full h-10 pl-10 pr-4 text-sm"
                 />
-                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs bg-muted rounded-md text-muted-foreground">
-                  ⌘K
-                </kbd>
               </div>
             </div>
 
             {/* Right Actions */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full" />
+                <Bell className="w-[18px] h-[18px]" />
+                <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-foreground rounded-full" />
               </Button>
               
-              <div className="h-8 w-px bg-border" />
+              <div className="h-6 w-px bg-border mx-2" />
               
-              <button className="flex items-center gap-3 p-2 rounded-xl hover:bg-secondary transition-colors">
-                <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
-                  <User className="w-4 h-4 text-primary-foreground" />
+              <button className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-300">
+                <div className="w-8 h-8 rounded-full bg-foreground flex items-center justify-center">
+                  <User className="w-4 h-4 text-background" />
                 </div>
                 <div className="text-left hidden sm:block">
                   <p className="text-sm font-medium">Creator</p>

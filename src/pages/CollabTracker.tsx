@@ -131,7 +131,7 @@ export default function CollabTracker() {
               <Download className="w-4 h-4" />
               Export
             </Button>
-            <Button variant="gradient" className="gap-2">
+            <Button variant="default" className="gap-2">
               <Plus className="w-4 h-4" />
               Add Deal
             </Button>

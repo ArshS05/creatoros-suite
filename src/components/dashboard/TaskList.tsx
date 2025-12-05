@@ -8,22 +8,15 @@ interface Task {
   title: string;
   dueTime?: string;
   completed: boolean;
-  priority: "low" | "medium" | "high";
 }
 
 const initialTasks: Task[] = [
-  { id: "1", title: "Film TikTok trend video", dueTime: "2:00 PM", completed: false, priority: "high" },
-  { id: "2", title: "Edit YouTube vlog", dueTime: "5:00 PM", completed: false, priority: "medium" },
-  { id: "3", title: "Reply to brand collab email", completed: true, priority: "high" },
-  { id: "4", title: "Schedule Instagram posts", dueTime: "Tomorrow", completed: false, priority: "low" },
-  { id: "5", title: "Review analytics dashboard", completed: false, priority: "medium" },
+  { id: "1", title: "Film TikTok trend video", dueTime: "2:00 PM", completed: false },
+  { id: "2", title: "Edit YouTube vlog", dueTime: "5:00 PM", completed: false },
+  { id: "3", title: "Reply to brand collab email", completed: true },
+  { id: "4", title: "Schedule Instagram posts", dueTime: "Tomorrow", completed: false },
+  { id: "5", title: "Review analytics dashboard", completed: false },
 ];
-
-const priorityColors = {
-  low: "bg-emerald-500",
-  medium: "bg-amber-500",
-  high: "bg-red-500",
-};
 
 export function TaskList() {
   const [tasks, setTasks] = useState(initialTasks);
@@ -38,28 +31,29 @@ export function TaskList() {
   const completedTasks = tasks.filter(t => t.completed);
 
   return (
-    <div className="bg-card rounded-2xl border border-border p-6">
+    <div className="glass-card p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-foreground">Today's Tasks</h3>
+          <h3 className="text-base font-medium text-foreground">Today's Tasks</h3>
           <p className="text-sm text-muted-foreground">{incompleteTasks.length} remaining</p>
         </div>
-        <Button variant="ghost" size="sm" className="gap-2">
+        <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
           <Plus className="w-4 h-4" />
-          Add Task
+          Add
         </Button>
       </div>
 
-      <div className="space-y-2">
-        {incompleteTasks.map((task) => (
+      <div className="space-y-1">
+        {incompleteTasks.map((task, index) => (
           <button
             key={task.id}
             onClick={() => toggleTask(task.id)}
-            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/50 transition-colors group text-left"
+            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition-all duration-300 group text-left opacity-0 animate-in"
+            style={{ animationDelay: `${index * 50}ms` }}
           >
-            <Circle className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+            <Circle className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">{task.title}</p>
+              <p className="text-sm text-foreground">{task.title}</p>
               {task.dueTime && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                   <Clock className="w-3 h-3" />
@@ -67,7 +61,6 @@ export function TaskList() {
                 </p>
               )}
             </div>
-            <div className={cn("w-2 h-2 rounded-full", priorityColors[task.priority])} />
           </button>
         ))}
 
@@ -82,9 +75,9 @@ export function TaskList() {
               <button
                 key={task.id}
                 onClick={() => toggleTask(task.id)}
-                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/50 transition-colors group text-left opacity-60"
+                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition-all duration-300 group text-left opacity-50"
               >
-                <CheckCircle2 className="w-5 h-5 text-primary" />
+                <CheckCircle2 className="w-4 h-4 text-foreground" />
                 <p className="text-sm text-muted-foreground line-through">{task.title}</p>
               </button>
             ))}
