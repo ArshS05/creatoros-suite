@@ -1,0 +1,19 @@
+project_id = "yfawacvqqfwqqkgpuqxh"
+
+[api]
+enabled = true
+
+[functions.generate-content-plan]
+verify_jwt = false
+
+[functions.generate-script]
+verify_jwt = false
+
+[functions.rescript-video]
+verify_jwt = false
+
+[functions.clean-inbox]
+verify_jwt = false
+
+[functions.build-website]
+verify_jwt = false

@@ -8,70 +8,65 @@ import {
   ExternalLink,
   Palette,
   Layout,
-  Type,
-  Image,
   Mail,
   DollarSign,
   Link as LinkIcon,
   Eye,
   Download,
-  RefreshCw,
   CheckCircle2,
   Grid3X3,
-  User
+  User,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { buildWebsiteFromInstagram } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
-interface WebsitePreview {
+interface WebsiteData {
   name: string;
   bio: string;
-  avatar: string;
-  posts: number;
-  followers: string;
+  headline?: string;
+  about?: string;
   links: { title: string; url: string }[];
-  content: { type: string; thumbnail: string }[];
-  services: { name: string; price: string; description: string }[];
+  services?: { name: string; price: string; description: string }[];
 }
-
-const sampleWebsite: WebsitePreview = {
-  name: "Alex Creator",
-  bio: "Content Creator • Lifestyle & Tech 📱 Helping you level up your content game. Based in LA 🌴",
-  avatar: "AC",
-  posts: 847,
-  followers: "247K",
-  links: [
-    { title: "YouTube", url: "#" },
-    { title: "TikTok", url: "#" },
-    { title: "Merch Store", url: "#" },
-    { title: "Podcast", url: "#" },
-  ],
-  content: [
-    { type: "reel", thumbnail: "📱" },
-    { type: "photo", thumbnail: "🎨" },
-    { type: "reel", thumbnail: "🎬" },
-    { type: "photo", thumbnail: "✨" },
-    { type: "reel", thumbnail: "🚀" },
-    { type: "photo", thumbnail: "💡" },
-  ],
-  services: [
-    { name: "1:1 Coaching Call", price: "$150", description: "30-minute strategy session" },
-    { name: "Content Review", price: "$75", description: "Detailed feedback on your content" },
-    { name: "Brand Consultation", price: "$300", description: "Full brand strategy session" },
-  ],
-};
 
 export default function WebsiteBuilder() {
   const [username, setUsername] = useState("");
   const [isBuilding, setIsBuilding] = useState(false);
-  const [website, setWebsite] = useState<WebsitePreview | null>(null);
+  const [website, setWebsite] = useState<WebsiteData | null>(null);
   const [selectedTheme, setSelectedTheme] = useState("dark");
 
-  const handleBuild = () => {
+  const handleBuild = async () => {
+    if (!username.trim()) {
+      toast({ title: "Please enter a username", variant: "destructive" });
+      return;
+    }
+
     setIsBuilding(true);
-    setTimeout(() => {
-      setWebsite(sampleWebsite);
+    try {
+      const result = await buildWebsiteFromInstagram({
+        username,
+        style: selectedTheme,
+        sections: ["Profile", "Links", "Content Grid", "Services", "Contact"],
+      });
+
+      if (result?.website) {
+        setWebsite({
+          name: result.website.name || username,
+          bio: result.website.bio || "",
+          headline: result.website.headline,
+          about: result.website.about,
+          links: result.website.links || [],
+          services: result.website.services || [],
+        });
+        toast({ title: "Website generated!", description: "Your personal website is ready" });
+      }
+    } catch (error) {
+      console.error("Build error:", error);
+    } finally {
       setIsBuilding(false);
-    }, 2500);
+    }
   };
 
   const themes = [
@@ -83,7 +78,6 @@ export default function WebsiteBuilder() {
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
-        {/* Header */}
         <div className="text-center max-w-2xl mx-auto">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
             <Globe className="w-4 h-4" />
@@ -95,7 +89,6 @@ export default function WebsiteBuilder() {
           </p>
         </div>
 
-        {/* Input Section */}
         <div className="bg-card border border-border rounded-3xl p-8">
           <div className="flex flex-col md:flex-row gap-4 items-center">
             <div className="relative flex-1 w-full">
@@ -117,7 +110,7 @@ export default function WebsiteBuilder() {
             >
               {isBuilding ? (
                 <>
-                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-5 h-5 animate-spin" />
                   Building...
                 </>
               ) : (
@@ -129,7 +122,6 @@ export default function WebsiteBuilder() {
             </Button>
           </div>
 
-          {/* Features */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 pt-8 border-t border-border">
             {[
               { icon: User, label: "Bio & Profile" },
@@ -145,10 +137,8 @@ export default function WebsiteBuilder() {
           </div>
         </div>
 
-        {/* Website Preview */}
         {website && (
           <div className="grid lg:grid-cols-3 gap-6 animate-slide-up">
-            {/* Preview */}
             <div className="lg:col-span-2">
               <div className="bg-card border border-border rounded-3xl overflow-hidden">
                 <div className="flex items-center justify-between p-4 border-b border-border">
@@ -174,24 +164,29 @@ export default function WebsiteBuilder() {
                   </div>
                 </div>
 
-                {/* Website Content */}
                 <div className={cn(
                   "p-8 min-h-[600px]",
                   selectedTheme === "dark" ? "bg-foreground" : selectedTheme === "gradient" ? "gradient-primary" : "bg-secondary"
                 )}>
                   <div className="max-w-md mx-auto text-center">
-                    {/* Avatar */}
                     <div className="w-24 h-24 mx-auto rounded-full bg-primary flex items-center justify-center text-3xl font-bold text-primary-foreground mb-4">
-                      {website.avatar}
+                      {website.name.charAt(0).toUpperCase()}
                     </div>
                     
-                    {/* Name & Bio */}
                     <h2 className={cn(
                       "text-2xl font-bold mb-2",
                       selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background" : "text-foreground"
                     )}>
                       {website.name}
                     </h2>
+                    {website.headline && (
+                      <p className={cn(
+                        "text-lg font-medium mb-2",
+                        selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background/90" : "text-foreground"
+                      )}>
+                        {website.headline}
+                      </p>
+                    )}
                     <p className={cn(
                       "text-sm mb-6",
                       selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background/70" : "text-muted-foreground"
@@ -199,35 +194,10 @@ export default function WebsiteBuilder() {
                       {website.bio}
                     </p>
 
-                    {/* Stats */}
-                    <div className="flex justify-center gap-8 mb-6">
-                      <div>
-                        <p className={cn(
-                          "text-xl font-bold",
-                          selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background" : "text-foreground"
-                        )}>{website.posts}</p>
-                        <p className={cn(
-                          "text-xs",
-                          selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background/60" : "text-muted-foreground"
-                        )}>Posts</p>
-                      </div>
-                      <div>
-                        <p className={cn(
-                          "text-xl font-bold",
-                          selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background" : "text-foreground"
-                        )}>{website.followers}</p>
-                        <p className={cn(
-                          "text-xs",
-                          selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background/60" : "text-muted-foreground"
-                        )}>Followers</p>
-                      </div>
-                    </div>
-
-                    {/* Links */}
                     <div className="space-y-3 mb-8">
-                      {website.links.map((link) => (
+                      {website.links.map((link, idx) => (
                         <button
-                          key={link.title}
+                          key={idx}
                           className={cn(
                             "w-full py-3 rounded-xl font-medium transition-colors",
                             selectedTheme === "dark" 
@@ -242,30 +212,54 @@ export default function WebsiteBuilder() {
                       ))}
                     </div>
 
-                    {/* Content Grid */}
-                    <div className="grid grid-cols-3 gap-2">
-                      {website.content.map((item, index) => (
-                        <div
-                          key={index}
-                          className={cn(
-                            "aspect-square rounded-xl flex items-center justify-center text-2xl",
-                            selectedTheme === "dark" || selectedTheme === "gradient"
-                              ? "bg-background/10"
-                              : "bg-card"
-                          )}
-                        >
-                          {item.thumbnail}
-                        </div>
-                      ))}
-                    </div>
+                    {website.services && website.services.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className={cn(
+                          "text-sm font-semibold uppercase tracking-wider",
+                          selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background/60" : "text-muted-foreground"
+                        )}>
+                          Services
+                        </h3>
+                        {website.services.map((service, idx) => (
+                          <div
+                            key={idx}
+                            className={cn(
+                              "p-4 rounded-xl text-left",
+                              selectedTheme === "dark" || selectedTheme === "gradient"
+                                ? "bg-background/10"
+                                : "bg-card"
+                            )}
+                          >
+                            <div className="flex justify-between items-start">
+                              <span className={cn(
+                                "font-medium",
+                                selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background" : "text-foreground"
+                              )}>
+                                {service.name}
+                              </span>
+                              <span className={cn(
+                                "font-bold",
+                                selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background" : "text-primary"
+                              )}>
+                                {service.price}
+                              </span>
+                            </div>
+                            <p className={cn(
+                              "text-xs mt-1",
+                              selectedTheme === "dark" || selectedTheme === "gradient" ? "text-background/60" : "text-muted-foreground"
+                            )}>
+                              {service.description}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Customization Panel */}
             <div className="space-y-4">
-              {/* Theme Selection */}
               <div className="bg-card border border-border rounded-2xl p-5">
                 <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
                   <Palette className="w-5 h-5 text-primary" />
@@ -290,7 +284,6 @@ export default function WebsiteBuilder() {
                 </div>
               </div>
 
-              {/* Sections */}
               <div className="bg-card border border-border rounded-2xl p-5">
                 <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
                   <Layout className="w-5 h-5 text-primary" />
@@ -301,7 +294,7 @@ export default function WebsiteBuilder() {
                     { icon: User, label: "Profile Header", enabled: true },
                     { icon: LinkIcon, label: "Link Buttons", enabled: true },
                     { icon: Grid3X3, label: "Content Grid", enabled: true },
-                    { icon: DollarSign, label: "Services/Pricing", enabled: false },
+                    { icon: DollarSign, label: "Services/Pricing", enabled: true },
                     { icon: Mail, label: "Contact Form", enabled: false },
                   ].map((section) => (
                     <div
@@ -326,7 +319,6 @@ export default function WebsiteBuilder() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="space-y-2">
                 <Button variant="default" className="w-full gap-2">
                   <CheckCircle2 className="w-4 h-4" />
@@ -341,11 +333,10 @@ export default function WebsiteBuilder() {
           </div>
         )}
 
-        {/* Empty State */}
         {!website && !isBuilding && (
           <div className="text-center py-16">
-            <div className="w-20 h-20 mx-auto rounded-3xl gradient-primary flex items-center justify-center mb-6">
-              <Globe className="w-10 h-10 text-primary-foreground" />
+            <div className="w-20 h-20 mx-auto rounded-3xl bg-foreground flex items-center justify-center mb-6">
+              <Globe className="w-10 h-10 text-background" />
             </div>
             <h3 className="text-xl font-semibold text-foreground mb-2">Create Your Website</h3>
             <p className="text-muted-foreground max-w-md mx-auto">

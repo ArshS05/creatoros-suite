@@ -5,15 +5,17 @@ import {
   Calendar, 
   ChevronLeft, 
   ChevronRight, 
-  Plus, 
   Sparkles, 
   Instagram, 
   Youtube, 
   Music2,
   Filter,
-  Download
+  Download,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { generateContentPlan } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -24,35 +26,6 @@ interface ContentItem {
   time: string;
   status: "scheduled" | "draft" | "published";
 }
-
-const sampleContent: Record<number, ContentItem[]> = {
-  3: [
-    { id: "1", title: "Morning Routine", platform: "youtube", time: "9:00 AM", status: "scheduled" },
-  ],
-  5: [
-    { id: "2", title: "GRWM", platform: "tiktok", time: "2:00 PM", status: "scheduled" },
-    { id: "3", title: "BTS Photo Dump", platform: "instagram", time: "6:00 PM", status: "draft" },
-  ],
-  8: [
-    { id: "4", title: "Product Review", platform: "youtube", time: "12:00 PM", status: "scheduled" },
-  ],
-  12: [
-    { id: "5", title: "Day in My Life", platform: "tiktok", time: "3:00 PM", status: "draft" },
-  ],
-  15: [
-    { id: "6", title: "Q&A Session", platform: "instagram", time: "7:00 PM", status: "scheduled" },
-  ],
-  18: [
-    { id: "7", title: "Collaboration Reveal", platform: "youtube", time: "10:00 AM", status: "scheduled" },
-  ],
-  22: [
-    { id: "8", title: "Trend Video", platform: "tiktok", time: "4:00 PM", status: "draft" },
-  ],
-  25: [
-    { id: "9", title: "Holiday Special", platform: "youtube", time: "11:00 AM", status: "scheduled" },
-    { id: "10", title: "Gift Guide", platform: "instagram", time: "5:00 PM", status: "scheduled" },
-  ],
-};
 
 const platformIcons = {
   instagram: Instagram,
@@ -69,13 +42,63 @@ const platformColors = {
 export default function ContentCalendar() {
   const [currentDate] = useState(new Date());
   const [selectedNiche, setSelectedNiche] = useState("");
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["Instagram", "YouTube", "TikTok"]);
+  const [selectedStyle, setSelectedStyle] = useState("Mixed");
   const [showGenerator, setShowGenerator] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [calendarContent, setCalendarContent] = useState<Record<number, ContentItem[]>>({});
 
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
   const adjustedFirstDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
-
   const monthName = currentDate.toLocaleString("default", { month: "long", year: "numeric" });
+
+  const togglePlatform = (platform: string) => {
+    setSelectedPlatforms(prev => 
+      prev.includes(platform) 
+        ? prev.filter(p => p !== platform)
+        : [...prev, platform]
+    );
+  };
+
+  const handleGenerate = async () => {
+    if (!selectedNiche.trim()) {
+      toast({ title: "Please enter your niche", variant: "destructive" });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const result = await generateContentPlan({
+        niche: selectedNiche,
+        platforms: selectedPlatforms,
+        style: selectedStyle,
+        days: 30,
+      });
+
+      if (result?.plan) {
+        const newContent: Record<number, ContentItem[]> = {};
+        result.plan.forEach((item: { day: number; title: string; platform: string; postingTime: string }) => {
+          const platformLower = item.platform?.toLowerCase() as "instagram" | "youtube" | "tiktok";
+          if (!newContent[item.day]) newContent[item.day] = [];
+          newContent[item.day].push({
+            id: `gen-${item.day}-${newContent[item.day].length}`,
+            title: item.title,
+            platform: platformLower || "instagram",
+            time: item.postingTime || "12:00 PM",
+            status: "draft",
+          });
+        });
+        setCalendarContent(newContent);
+        toast({ title: "Content plan generated!", description: "30-day plan added to calendar" });
+      }
+      setShowGenerator(false);
+    } catch (error) {
+      console.error("Generation error:", error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <AppLayout>
@@ -107,8 +130,8 @@ export default function ContentCalendar() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
             <div className="bg-card border border-border rounded-3xl p-8 max-w-lg w-full mx-4 shadow-xl">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 rounded-xl gradient-primary">
-                  <Sparkles className="w-6 h-6 text-primary-foreground" />
+                <div className="p-3 rounded-xl bg-foreground">
+                  <Sparkles className="w-6 h-6 text-background" />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-foreground">AI Content Generator</h2>
@@ -134,7 +157,13 @@ export default function ContentCalendar() {
                     {["Instagram", "YouTube", "TikTok"].map((platform) => (
                       <button
                         key={platform}
-                        className="flex-1 py-3 px-4 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors border-2 border-transparent hover:border-primary"
+                        onClick={() => togglePlatform(platform)}
+                        className={cn(
+                          "flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-colors border-2",
+                          selectedPlatforms.includes(platform)
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-secondary hover:bg-secondary/80 text-foreground border-transparent"
+                        )}
                       >
                         {platform}
                       </button>
@@ -144,7 +173,11 @@ export default function ContentCalendar() {
 
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">Content Style</label>
-                  <select className="w-full h-12 px-4 rounded-xl bg-secondary border-none text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+                  <select 
+                    value={selectedStyle}
+                    onChange={(e) => setSelectedStyle(e.target.value)}
+                    className="w-full h-12 px-4 rounded-xl bg-secondary border-none text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
                     <option>Educational</option>
                     <option>Entertainment</option>
                     <option>Lifestyle</option>
@@ -154,12 +187,21 @@ export default function ContentCalendar() {
               </div>
 
               <div className="flex gap-3 mt-8">
-                <Button variant="outline" className="flex-1" onClick={() => setShowGenerator(false)}>
+                <Button variant="outline" className="flex-1" onClick={() => setShowGenerator(false)} disabled={isGenerating}>
                   Cancel
                 </Button>
-                <Button variant="default" className="flex-1 gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  Generate Plan
+                <Button variant="default" className="flex-1 gap-2" onClick={handleGenerate} disabled={isGenerating}>
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Generate Plan
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -168,7 +210,6 @@ export default function ContentCalendar() {
 
         {/* Calendar */}
         <div className="bg-card rounded-3xl border border-border p-6">
-          {/* Calendar Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1">
@@ -187,7 +228,6 @@ export default function ContentCalendar() {
             </Button>
           </div>
 
-          {/* Week Days */}
           <div className="grid grid-cols-7 gap-2 mb-2">
             {weekDays.map((day) => (
               <div key={day} className="text-center py-2 text-sm font-medium text-muted-foreground">
@@ -196,17 +236,14 @@ export default function ContentCalendar() {
             ))}
           </div>
 
-          {/* Calendar Grid */}
           <div className="grid grid-cols-7 gap-2">
-            {/* Empty cells for days before the first of the month */}
             {Array.from({ length: adjustedFirstDay }).map((_, index) => (
               <div key={`empty-${index}`} className="h-32 rounded-xl bg-secondary/30" />
             ))}
             
-            {/* Days of the month */}
             {Array.from({ length: daysInMonth }).map((_, index) => {
               const day = index + 1;
-              const content = sampleContent[day] || [];
+              const content = calendarContent[day] || [];
               const isToday = day === currentDate.getDate();
               
               return (
@@ -251,7 +288,6 @@ export default function ContentCalendar() {
           </div>
         </div>
 
-        {/* Platform Legend */}
         <div className="flex items-center gap-6">
           {Object.entries(platformColors).map(([platform, color]) => (
             <div key={platform} className="flex items-center gap-2">

@@ -14,9 +14,12 @@ import {
   Building2,
   CheckCircle2,
   XCircle,
-  MoreHorizontal
+  MoreHorizontal,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { cleanInbox } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
@@ -31,6 +34,12 @@ interface Message {
   status: "new" | "read" | "replied" | "archived";
   timestamp: string;
   starred: boolean;
+  aiAnalysis?: {
+    priorityScore?: number;
+    estimatedValue?: string;
+    recommendedAction?: string;
+    responseTemplate?: string;
+  };
 }
 
 const sampleMessages: Message[] = [
@@ -120,6 +129,7 @@ export default function CollabInbox() {
   const [messages, setMessages] = useState(sampleMessages);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(sampleMessages[0]);
   const [filter, setFilter] = useState<"all" | "new" | "starred" | "brands">("all");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const filteredMessages = messages.filter((msg) => {
     if (filter === "all") return true;
@@ -135,10 +145,53 @@ export default function CollabInbox() {
     ));
   };
 
+  const handleAnalyzeAll = async () => {
+    setIsAnalyzing(true);
+    try {
+      const messagesToAnalyze = messages.map(m => ({
+        id: m.id,
+        sender: m.sender,
+        company: m.company,
+        subject: m.subject,
+        preview: m.preview,
+        budget: m.budget,
+      }));
+
+      const result = await cleanInbox(messagesToAnalyze);
+
+      if (result?.analysis) {
+        const updatedMessages = messages.map(msg => {
+          const analysis = result.analysis.find((a: { messageId: string }) => a.messageId === msg.id);
+          if (analysis) {
+            return {
+              ...msg,
+              priority: analysis.priorityScore >= 7 ? "high" : analysis.priorityScore >= 4 ? "medium" : "low",
+              aiAnalysis: {
+                priorityScore: analysis.priorityScore,
+                estimatedValue: analysis.estimatedValue,
+                recommendedAction: analysis.recommendedAction,
+                responseTemplate: analysis.responseTemplate,
+              },
+            } as Message;
+          }
+          return msg;
+        });
+        setMessages(updatedMessages);
+        toast({ 
+          title: "Analysis complete!", 
+          description: `${result.summary?.highPriority || 0} high priority messages found` 
+        });
+      }
+    } catch (error) {
+      console.error("Analysis error:", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
-        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Collab Inbox</h1>
@@ -149,18 +202,26 @@ export default function CollabInbox() {
               <Filter className="w-4 h-4" />
               Sort by Value
             </Button>
-            <Button variant="default" className="gap-2">
-              <Sparkles className="w-4 h-4" />
-              AI Analyze All
+            <Button variant="default" className="gap-2" onClick={handleAnalyzeAll} disabled={isAnalyzing}>
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  AI Analyze All
+                </>
+              )}
             </Button>
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: "New Messages", value: "12", icon: MessageSquare, color: "text-primary" },
-            { label: "High Priority", value: "3", icon: Star, color: "text-amber-500" },
+            { label: "New Messages", value: messages.filter(m => m.status === "new").length.toString(), icon: MessageSquare, color: "text-primary" },
+            { label: "High Priority", value: messages.filter(m => m.priority === "high").length.toString(), icon: Star, color: "text-amber-500" },
             { label: "Potential Revenue", value: "$23K", icon: DollarSign, color: "text-emerald-500" },
             { label: "Response Rate", value: "94%", icon: CheckCircle2, color: "text-primary" },
           ].map((stat) => (
@@ -176,11 +237,8 @@ export default function CollabInbox() {
           ))}
         </div>
 
-        {/* Inbox */}
         <div className="grid lg:grid-cols-5 gap-6">
-          {/* Message List */}
           <div className="lg:col-span-2 bg-card border border-border rounded-2xl overflow-hidden">
-            {/* Search & Filters */}
             <div className="p-4 border-b border-border space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -213,7 +271,6 @@ export default function CollabInbox() {
               </div>
             </div>
 
-            {/* Messages */}
             <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
               {filteredMessages.map((msg) => (
                 <button
@@ -247,7 +304,7 @@ export default function CollabInbox() {
                         </span>
                         {msg.budget && (
                           <span className="text-xs text-emerald-500">
-                            {msg.budget}
+                            {msg.aiAnalysis?.estimatedValue || msg.budget}
                           </span>
                         )}
                       </div>
@@ -270,17 +327,15 @@ export default function CollabInbox() {
             </div>
           </div>
 
-          {/* Message Detail */}
           <div className="lg:col-span-3 bg-card border border-border rounded-2xl">
             {selectedMessage ? (
               <div className="h-full flex flex-col">
-                {/* Header */}
                 <div className="p-6 border-b border-border">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
-                          <Building2 className="w-6 h-6 text-primary-foreground" />
+                        <div className="w-12 h-12 rounded-xl bg-foreground flex items-center justify-center">
+                          <Building2 className="w-6 h-6 text-background" />
                         </div>
                         <div>
                           <h2 className="text-lg font-semibold text-foreground">{selectedMessage.company}</h2>
@@ -302,7 +357,6 @@ export default function CollabInbox() {
                     </div>
                   </div>
 
-                  {/* AI Insights */}
                   <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles className="w-4 h-4 text-primary" />
@@ -311,7 +365,9 @@ export default function CollabInbox() {
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
                         <p className="text-muted-foreground">Est. Value</p>
-                        <p className="font-semibold text-emerald-500">{selectedMessage.budget || "TBD"}</p>
+                        <p className="font-semibold text-emerald-500">
+                          {selectedMessage.aiAnalysis?.estimatedValue || selectedMessage.budget || "TBD"}
+                        </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Deadline</p>
@@ -325,13 +381,21 @@ export default function CollabInbox() {
                           selectedMessage.priority === "medium" ? "text-amber-500" : "text-emerald-500"
                         )}>
                           {selectedMessage.priority}
+                          {selectedMessage.aiAnalysis?.priorityScore && ` (${selectedMessage.aiAnalysis.priorityScore}/10)`}
                         </p>
                       </div>
                     </div>
+                    {selectedMessage.aiAnalysis?.recommendedAction && (
+                      <div className="mt-3 pt-3 border-t border-primary/20">
+                        <p className="text-xs text-muted-foreground">Recommended Action</p>
+                        <p className="text-sm font-medium text-foreground capitalize">
+                          {selectedMessage.aiAnalysis.recommendedAction}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Message Content */}
                 <div className="flex-1 p-6 overflow-y-auto">
                   <p className="text-foreground leading-relaxed">
                     {selectedMessage.preview}
@@ -348,7 +412,6 @@ export default function CollabInbox() {
                   </p>
                 </div>
 
-                {/* Actions */}
                 <div className="p-6 border-t border-border">
                   <div className="flex gap-3">
                     <Button variant="default" className="flex-1 gap-2">
