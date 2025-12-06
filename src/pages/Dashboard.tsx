@@ -1,16 +1,51 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { TaskList } from "@/components/dashboard/TaskList";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { UpcomingContent } from "@/components/dashboard/UpcomingContent";
-import { Users, Eye, Heart, TrendingUp, Sparkles } from "lucide-react";
+import { Users, Eye, Heart, TrendingUp, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { generateScript } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedScript, setGeneratedScript] = useState<string | null>(null);
+
+  const handleQuickGenerate = async (type: "script" | "hooks" | "captions") => {
+    setIsGenerating(true);
+    try {
+      const result = await generateScript({
+        topic: "trending content in my niche",
+        platform: "TikTok/Instagram Reel",
+        duration: "60 seconds",
+        style: type === "hooks" ? "Hook-focused" : type === "captions" ? "Caption-focused" : "Full script",
+      });
+
+      if (result) {
+        if (type === "script" && result.script) {
+          const scriptText = typeof result.script === "string" 
+            ? result.script 
+            : `${result.script.hook}\n\n${result.script.intro}\n\n${result.script.mainContent}\n\n${result.script.cta}`;
+          setGeneratedScript(scriptText);
+        } else if (type === "hooks" && result.alternativeHooks?.length) {
+          setGeneratedScript(result.alternativeHooks.join("\n\n"));
+        } else if (type === "captions" && result.captions?.length) {
+          setGeneratedScript(result.captions.join("\n\n---\n\n"));
+        }
+        toast({ title: `${type.charAt(0).toUpperCase() + type.slice(1)} generated!` });
+      }
+    } catch (error) {
+      console.error("Generation error:", error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto space-y-8">
-        {/* Welcome Section */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 opacity-0 animate-in">
           <div>
             <h1 className="text-2xl font-semibold text-foreground tracking-tight">
@@ -20,13 +55,21 @@ export default function Dashboard() {
               Here's what's happening with your content today.
             </p>
           </div>
-          <Button className="gap-2">
-            <Sparkles className="w-4 h-4" />
-            Generate Content
+          <Button className="gap-2" onClick={() => handleQuickGenerate("script")} disabled={isGenerating}>
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Generate Content
+              </>
+            )}
           </Button>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="opacity-0 animate-in stagger-1">
             <StatCard
@@ -62,9 +105,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             <div className="opacity-0 animate-in" style={{ animationDelay: '0.3s' }}>
               <UpcomingContent />
@@ -74,13 +115,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Right Column */}
           <div className="opacity-0 animate-in" style={{ animationDelay: '0.5s' }}>
             <TaskList />
           </div>
         </div>
 
-        {/* AI Assistant Card */}
         <div className="glass-card p-8 opacity-0 animate-in" style={{ animationDelay: '0.6s' }}>
           <div className="flex items-start gap-4">
             <div className="p-3 bg-foreground rounded-xl">
@@ -92,10 +131,51 @@ export default function Dashboard() {
                 Let AI help you create engaging content. Generate scripts, hooks, captions, and more with just a click.
               </p>
               <div className="flex flex-wrap gap-2 mt-4">
-                <Button variant="secondary" size="sm">Generate Script</Button>
-                <Button variant="secondary" size="sm">Create Hooks</Button>
-                <Button variant="secondary" size="sm">Write Captions</Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={() => handleQuickGenerate("script")}
+                  disabled={isGenerating}
+                >
+                  Generate Script
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => handleQuickGenerate("hooks")}
+                  disabled={isGenerating}
+                >
+                  Create Hooks
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => handleQuickGenerate("captions")}
+                  disabled={isGenerating}
+                >
+                  Write Captions
+                </Button>
               </div>
+              
+              {generatedScript && (
+                <div className="mt-4 p-4 bg-secondary rounded-xl">
+                  <p className="text-xs text-muted-foreground mb-2">Generated Content:</p>
+                  <pre className="text-sm text-foreground whitespace-pre-wrap font-sans">
+                    {generatedScript}
+                  </pre>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="mt-2"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedScript);
+                      toast({ title: "Copied to clipboard!" });
+                    }}
+                  >
+                    Copy
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
