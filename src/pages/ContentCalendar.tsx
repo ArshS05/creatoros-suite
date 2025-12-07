@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { 
@@ -14,7 +14,7 @@ import {
   Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { generateContentPlan } from "@/lib/api";
+import { generateContentPlan, saveContentPlan, getContentPlans } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -53,6 +53,37 @@ export default function ContentCalendar() {
   const adjustedFirstDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
   const monthName = currentDate.toLocaleString("default", { month: "long", year: "numeric" });
 
+  useEffect(() => {
+    loadSavedPlans();
+  }, []);
+
+  const loadSavedPlans = async () => {
+    try {
+      const plans = await getContentPlans();
+      if (plans && plans.length > 0) {
+        const latestPlan = plans[0];
+        const planData = latestPlan.plan as Array<{ day: number; title: string; platform: string; postingTime: string }>;
+        if (Array.isArray(planData)) {
+          const content: Record<number, ContentItem[]> = {};
+          planData.forEach((item) => {
+            const platformLower = item.platform?.toLowerCase() as "instagram" | "youtube" | "tiktok";
+            if (!content[item.day]) content[item.day] = [];
+            content[item.day].push({
+              id: `saved-${item.day}-${content[item.day].length}`,
+              title: item.title,
+              platform: platformLower || "instagram",
+              time: item.postingTime || "12:00 PM",
+              status: "draft",
+            });
+          });
+          setCalendarContent(content);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load plans:", error);
+    }
+  };
+
   const togglePlatform = (platform: string) => {
     setSelectedPlatforms(prev => 
       prev.includes(platform) 
@@ -90,7 +121,16 @@ export default function ContentCalendar() {
           });
         });
         setCalendarContent(newContent);
-        toast({ title: "Content plan generated!", description: "30-day plan added to calendar" });
+
+        // Save to database
+        await saveContentPlan({
+          niche: selectedNiche,
+          platforms: selectedPlatforms,
+          style: selectedStyle,
+          plan: result.plan,
+        });
+
+        toast({ title: "Content plan generated & saved!", description: "30-day plan added to calendar" });
       }
       setShowGenerator(false);
     } catch (error) {
