@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.build-website]
 verify_jwt = false
+
+[functions.organize-ideas]
+verify_jwt = false
