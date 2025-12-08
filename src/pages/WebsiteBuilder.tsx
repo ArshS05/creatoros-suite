@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { 
@@ -16,26 +16,82 @@ import {
   CheckCircle2,
   Grid3X3,
   User,
-  Loader2
+  Loader2,
+  Save,
+  Code
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { buildWebsiteFromInstagram } from "@/lib/api";
+import { 
+  buildWebsiteFromInstagram, 
+  saveWebsite, 
+  getWebsites, 
+  updateWebsite,
+  generateWebsiteHTML 
+} from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface WebsiteData {
+  id?: string;
+  username: string;
   name: string;
   bio: string;
   headline?: string;
   about?: string;
   links: { title: string; url: string }[];
   services?: { name: string; price: string; description: string }[];
+  theme: string;
+  published: boolean;
 }
 
 export default function WebsiteBuilder() {
   const [username, setUsername] = useState("");
   const [isBuilding, setIsBuilding] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [website, setWebsite] = useState<WebsiteData | null>(null);
+  const [savedWebsites, setSavedWebsites] = useState<WebsiteData[]>([]);
   const [selectedTheme, setSelectedTheme] = useState("dark");
+  const [showPreview, setShowPreview] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [htmlContent, setHtmlContent] = useState("");
+  const [sections, setSections] = useState({
+    profile: true,
+    links: true,
+    grid: true,
+    services: true,
+    contact: false,
+  });
+
+  useEffect(() => {
+    loadSavedWebsites();
+  }, []);
+
+  const loadSavedWebsites = async () => {
+    try {
+      const data = await getWebsites();
+      if (data) {
+        const mapped = data.map(w => ({
+          id: w.id,
+          username: w.username,
+          name: w.name || "",
+          bio: w.bio || "",
+          headline: w.headline || undefined,
+          about: w.about || undefined,
+          links: (w.links as { title: string; url: string }[]) || [],
+          services: (w.services as { name: string; price: string; description: string }[]) || [],
+          theme: w.theme || "dark",
+          published: w.published || false,
+        }));
+        setSavedWebsites(mapped);
+        if (mapped.length > 0 && !website) {
+          setWebsite(mapped[0]);
+          setSelectedTheme(mapped[0].theme);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading websites:", error);
+    }
+  };
 
   const handleBuild = async () => {
     if (!username.trim()) {
@@ -45,21 +101,29 @@ export default function WebsiteBuilder() {
 
     setIsBuilding(true);
     try {
+      const activeSections = Object.entries(sections)
+        .filter(([_, enabled]) => enabled)
+        .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1));
+
       const result = await buildWebsiteFromInstagram({
         username,
         style: selectedTheme,
-        sections: ["Profile", "Links", "Content Grid", "Services", "Contact"],
+        sections: activeSections,
       });
 
       if (result?.website) {
-        setWebsite({
+        const newWebsite: WebsiteData = {
+          username,
           name: result.website.name || username,
           bio: result.website.bio || "",
           headline: result.website.headline,
           about: result.website.about,
           links: result.website.links || [],
           services: result.website.services || [],
-        });
+          theme: selectedTheme,
+          published: false,
+        };
+        setWebsite(newWebsite);
         toast({ title: "Website generated!", description: "Your personal website is ready" });
       }
     } catch (error) {
@@ -69,11 +133,101 @@ export default function WebsiteBuilder() {
     }
   };
 
+  const handleSave = async () => {
+    if (!website) return;
+
+    setIsSaving(true);
+    try {
+      const html = generateWebsiteHTML({
+        name: website.name,
+        bio: website.bio,
+        headline: website.headline,
+        about: website.about,
+        links: website.links,
+        services: website.services,
+        theme: website.theme,
+      });
+
+      if (website.id) {
+        await updateWebsite(website.id, {
+          name: website.name,
+          bio: website.bio,
+          headline: website.headline,
+          about: website.about,
+          theme: website.theme,
+          links: website.links,
+          services: website.services,
+          html_content: html,
+        });
+        toast({ title: "Website updated!" });
+      } else {
+        const saved = await saveWebsite({
+          username: website.username,
+          name: website.name,
+          bio: website.bio,
+          headline: website.headline,
+          about: website.about,
+          theme: website.theme,
+          links: website.links,
+          services: website.services,
+          html_content: html,
+        });
+        setWebsite({ ...website, id: saved.id });
+        toast({ title: "Website saved!" });
+      }
+      await loadSavedWebsites();
+    } catch (error) {
+      console.error("Save error:", error);
+      toast({ title: "Error saving website", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (!website) return;
+
+    const html = generateWebsiteHTML({
+      name: website.name,
+      bio: website.bio,
+      headline: website.headline,
+      about: website.about,
+      links: website.links,
+      services: website.services,
+      theme: website.theme,
+    });
+
+    setHtmlContent(html);
+    setShowExport(true);
+  };
+
+  const downloadHTML = () => {
+    const blob = new Blob([htmlContent], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${website?.username || "website"}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "HTML file downloaded!" });
+  };
+
+  const copyHTML = () => {
+    navigator.clipboard.writeText(htmlContent);
+    toast({ title: "HTML copied to clipboard!" });
+  };
+
   const themes = [
     { id: "dark", name: "Dark", bg: "bg-foreground", accent: "bg-primary" },
     { id: "light", name: "Light", bg: "bg-secondary", accent: "bg-primary" },
     { id: "gradient", name: "Gradient", bg: "gradient-primary", accent: "bg-accent" },
   ];
+
+  const toggleSection = (key: keyof typeof sections) => {
+    setSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <AppLayout>
@@ -149,17 +303,17 @@ export default function WebsiteBuilder() {
                       <div className="w-3 h-3 rounded-full bg-emerald-500" />
                     </div>
                     <span className="text-xs text-muted-foreground ml-2">
-                      {username.toLowerCase().replace(/[^a-z0-9]/g, "")}.creatorsite.com
+                      {website.username.toLowerCase().replace(/[^a-z0-9]/g, "")}.creatorsite.com
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" className="gap-2">
+                    <Button variant="ghost" size="sm" className="gap-2" onClick={() => setShowPreview(true)}>
                       <Eye className="w-4 h-4" />
                       Preview
                     </Button>
-                    <Button variant="ghost" size="sm" className="gap-2">
-                      <ExternalLink className="w-4 h-4" />
-                      Open
+                    <Button variant="ghost" size="sm" className="gap-2" onClick={handleExport}>
+                      <Code className="w-4 h-4" />
+                      View Code
                     </Button>
                   </div>
                 </div>
@@ -269,7 +423,10 @@ export default function WebsiteBuilder() {
                   {themes.map((theme) => (
                     <button
                       key={theme.id}
-                      onClick={() => setSelectedTheme(theme.id)}
+                      onClick={() => {
+                        setSelectedTheme(theme.id);
+                        setWebsite(prev => prev ? { ...prev, theme: theme.id } : null);
+                      }}
                       className={cn(
                         "p-3 rounded-xl border-2 transition-colors",
                         selectedTheme === theme.id
@@ -291,42 +448,52 @@ export default function WebsiteBuilder() {
                 </h3>
                 <div className="space-y-2">
                   {[
-                    { icon: User, label: "Profile Header", enabled: true },
-                    { icon: LinkIcon, label: "Link Buttons", enabled: true },
-                    { icon: Grid3X3, label: "Content Grid", enabled: true },
-                    { icon: DollarSign, label: "Services/Pricing", enabled: true },
-                    { icon: Mail, label: "Contact Form", enabled: false },
+                    { key: "profile" as const, icon: User, label: "Profile Header" },
+                    { key: "links" as const, icon: LinkIcon, label: "Link Buttons" },
+                    { key: "grid" as const, icon: Grid3X3, label: "Content Grid" },
+                    { key: "services" as const, icon: DollarSign, label: "Services/Pricing" },
+                    { key: "contact" as const, icon: Mail, label: "Contact Form" },
                   ].map((section) => (
-                    <div
-                      key={section.label}
-                      className="flex items-center justify-between p-3 rounded-xl bg-secondary/50"
+                    <button
+                      key={section.key}
+                      onClick={() => toggleSection(section.key)}
+                      className="w-full flex items-center justify-between p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <section.icon className="w-4 h-4 text-muted-foreground" />
                         <span className="text-sm text-foreground">{section.label}</span>
                       </div>
                       <div className={cn(
-                        "w-10 h-6 rounded-full p-1 transition-colors cursor-pointer",
-                        section.enabled ? "bg-primary" : "bg-secondary"
+                        "w-10 h-6 rounded-full p-1 transition-colors",
+                        sections[section.key] ? "bg-primary" : "bg-muted"
                       )}>
                         <div className={cn(
                           "w-4 h-4 rounded-full bg-card transition-transform",
-                          section.enabled && "translate-x-4"
+                          sections[section.key] && "translate-x-4"
                         )} />
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Button variant="default" className="w-full gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Publish Website
+                <Button 
+                  variant="default" 
+                  className="w-full gap-2"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  {website.id ? "Update Website" : "Save Website"}
                 </Button>
-                <Button variant="outline" className="w-full gap-2">
+                <Button variant="outline" className="w-full gap-2" onClick={handleExport}>
                   <Download className="w-4 h-4" />
-                  Export Code
+                  Export HTML
                 </Button>
               </div>
             </div>
@@ -344,6 +511,53 @@ export default function WebsiteBuilder() {
             </p>
           </div>
         )}
+
+        {/* Preview Dialog */}
+        <Dialog open={showPreview} onOpenChange={setShowPreview}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle>Website Preview</DialogTitle>
+            </DialogHeader>
+            {website && (
+              <iframe
+                srcDoc={generateWebsiteHTML({
+                  name: website.name,
+                  bio: website.bio,
+                  headline: website.headline,
+                  about: website.about,
+                  links: website.links,
+                  services: website.services,
+                  theme: website.theme,
+                })}
+                className="w-full h-[600px] border border-border rounded-lg"
+                title="Website Preview"
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Export Dialog */}
+        <Dialog open={showExport} onOpenChange={setShowExport}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Export HTML</span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={copyHTML}>
+                    Copy Code
+                  </Button>
+                  <Button size="sm" onClick={downloadHTML}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            <pre className="bg-secondary rounded-lg p-4 overflow-auto max-h-[500px] text-xs text-foreground">
+              <code>{htmlContent}</code>
+            </pre>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

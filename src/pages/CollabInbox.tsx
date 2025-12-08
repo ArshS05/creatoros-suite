@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { 
@@ -15,11 +15,20 @@ import {
   CheckCircle2,
   XCircle,
   MoreHorizontal,
-  Loader2
+  Loader2,
+  Plus,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { cleanInbox } from "@/lib/api";
+import { 
+  cleanInbox, 
+  getInboxMessages, 
+  createInboxMessage, 
+  updateInboxMessage, 
+  deleteInboxMessage 
+} from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import type { Json } from "@/integrations/supabase/types";
 
 interface Message {
   id: string;
@@ -27,14 +36,15 @@ interface Message {
   company: string;
   subject: string;
   preview: string;
+  full_content?: string;
   budget?: string;
   deadline?: string;
   category: "brand" | "agency" | "pr" | "other";
   priority: "high" | "medium" | "low";
   status: "new" | "read" | "replied" | "archived";
-  timestamp: string;
+  created_at: string;
   starred: boolean;
-  aiAnalysis?: {
+  ai_analysis?: {
     priorityScore?: number;
     estimatedValue?: string;
     recommendedAction?: string;
@@ -42,73 +52,36 @@ interface Message {
   };
 }
 
-const sampleMessages: Message[] = [
+const sampleMessages = [
   {
-    id: "1",
     sender: "Sarah M.",
     company: "Nike",
     subject: "Partnership Opportunity - Summer Campaign",
-    preview: "Hi! We love your content and would like to discuss a potential partnership for our upcoming summer campaign. We're looking for creators who...",
+    preview: "Hi! We love your content and would like to discuss a potential partnership for our upcoming summer campaign.",
+    full_content: "Hi! We love your content and would like to discuss a potential partnership for our upcoming summer campaign. We're looking for creators who align with our brand values and have an engaged audience. We've been following your work and really appreciate your authentic approach to lifestyle content. Your engagement rates are impressive and your audience demographics align perfectly with our target market. For this campaign, we're looking for 2 Instagram posts and 1 TikTok video. We're open to discussing your creative vision and rates. Let me know if you'd like to schedule a call to discuss further!",
     budget: "$5,000 - $10,000",
-    deadline: "Dec 15, 2024",
-    category: "brand",
-    priority: "high",
-    status: "new",
-    timestamp: "2 hours ago",
-    starred: true,
+    category: "brand" as const,
+    priority: "high" as const,
   },
   {
-    id: "2",
     sender: "Michael K.",
     company: "Talent Agency Pro",
     subject: "Exclusive Brand Deals Available",
-    preview: "I represent several major brands looking for lifestyle creators. Your engagement rates are impressive and I'd love to connect about some opportunities...",
+    preview: "I represent several major brands looking for lifestyle creators. Your engagement rates are impressive.",
+    full_content: "I represent several major brands looking for lifestyle creators. Your engagement rates are impressive and I'd love to connect about some opportunities we have available.",
     budget: "Various",
-    category: "agency",
-    priority: "medium",
-    status: "new",
-    timestamp: "5 hours ago",
-    starred: false,
+    category: "agency" as const,
+    priority: "medium" as const,
   },
   {
-    id: "3",
     sender: "Emma L.",
     company: "Glossier",
     subject: "Product Seeding + Potential Paid Collab",
-    preview: "We'd love to send you some of our new products! If you like them and it feels authentic, we could discuss a paid partnership...",
+    preview: "We'd love to send you some of our new products! If you like them, we could discuss a paid partnership.",
+    full_content: "We'd love to send you some of our new products! If you like them and it feels authentic, we could discuss a paid partnership.",
     budget: "$2,000 - $3,000",
-    deadline: "Jan 5, 2025",
-    category: "brand",
-    priority: "medium",
-    status: "read",
-    timestamp: "1 day ago",
-    starred: true,
-  },
-  {
-    id: "4",
-    sender: "PR Team",
-    company: "Tech Startup XYZ",
-    subject: "Review Unit + Coverage Request",
-    preview: "We're launching our new product next month and would love to send you a review unit. No paid commitment required, just honest feedback...",
-    category: "pr",
-    priority: "low",
-    status: "read",
-    timestamp: "2 days ago",
-    starred: false,
-  },
-  {
-    id: "5",
-    sender: "James W.",
-    company: "Adidas",
-    subject: "RE: Collab Discussion",
-    preview: "Thanks for your media kit! Our team reviewed it and we'd like to move forward. Can we schedule a call this week to discuss...",
-    budget: "$8,000",
-    deadline: "Dec 20, 2024",
-    category: "brand",
-    priority: "high",
-    status: "replied",
-    timestamp: "3 days ago",
-    starred: true,
+    category: "brand" as const,
+    priority: "medium" as const,
   },
 ];
 
@@ -126,23 +99,119 @@ const priorityColors = {
 };
 
 export default function CollabInbox() {
-  const [messages, setMessages] = useState(sampleMessages);
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(sampleMessages[0]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [filter, setFilter] = useState<"all" | "new" | "starred" | "brands">("all");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    loadMessages();
+  }, []);
+
+  const loadMessages = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getInboxMessages();
+      if (data && data.length > 0) {
+        const mappedMessages: Message[] = data.map(m => ({
+          id: m.id,
+          sender: m.sender,
+          company: m.company || "",
+          subject: m.subject,
+          preview: m.preview || "",
+          full_content: m.full_content || "",
+          budget: m.budget || undefined,
+          deadline: m.deadline || undefined,
+          category: (m.category as Message["category"]) || "other",
+          priority: (m.priority as Message["priority"]) || "medium",
+          status: (m.status as Message["status"]) || "new",
+          created_at: m.created_at,
+          starred: m.starred || false,
+          ai_analysis: m.ai_analysis as Message["ai_analysis"] || undefined,
+        }));
+        setMessages(mappedMessages);
+        if (mappedMessages.length > 0) {
+          setSelectedMessage(mappedMessages[0]);
+        }
+      } else {
+        // Load sample messages if no data
+        await seedSampleMessages();
+      }
+    } catch (error) {
+      console.error("Error loading messages:", error);
+      toast({ title: "Error loading messages", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const seedSampleMessages = async () => {
+    try {
+      for (const msg of sampleMessages) {
+        await createInboxMessage(msg);
+      }
+      await loadMessages();
+      toast({ title: "Sample messages added!" });
+    } catch (error) {
+      console.error("Error seeding messages:", error);
+    }
+  };
 
   const filteredMessages = messages.filter((msg) => {
-    if (filter === "all") return true;
-    if (filter === "new") return msg.status === "new";
-    if (filter === "starred") return msg.starred;
-    if (filter === "brands") return msg.category === "brand";
-    return true;
+    const matchesFilter = 
+      filter === "all" ? true :
+      filter === "new" ? msg.status === "new" :
+      filter === "starred" ? msg.starred :
+      filter === "brands" ? msg.category === "brand" :
+      true;
+    
+    const matchesSearch = searchQuery === "" || 
+      msg.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      msg.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      msg.sender.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesFilter && matchesSearch;
   });
 
-  const toggleStar = (id: string) => {
-    setMessages(messages.map(msg => 
-      msg.id === id ? { ...msg, starred: !msg.starred } : msg
-    ));
+  const toggleStar = async (id: string) => {
+    const msg = messages.find(m => m.id === id);
+    if (!msg) return;
+
+    try {
+      await updateInboxMessage(id, { starred: !msg.starred });
+      setMessages(messages.map(m => 
+        m.id === id ? { ...m, starred: !m.starred } : m
+      ));
+    } catch (error) {
+      console.error("Error updating message:", error);
+    }
+  };
+
+  const handleDeleteMessage = async (id: string) => {
+    try {
+      await deleteInboxMessage(id);
+      setMessages(messages.filter(m => m.id !== id));
+      if (selectedMessage?.id === id) {
+        setSelectedMessage(messages.find(m => m.id !== id) || null);
+      }
+      toast({ title: "Message deleted" });
+    } catch (error) {
+      console.error("Error deleting message:", error);
+    }
+  };
+
+  const handleArchiveMessage = async (id: string) => {
+    try {
+      await updateInboxMessage(id, { status: "archived" });
+      setMessages(messages.map(m => 
+        m.id === id ? { ...m, status: "archived" as const } : m
+      ));
+      toast({ title: "Message archived" });
+    } catch (error) {
+      console.error("Error archiving message:", error);
+    }
   };
 
   const handleAnalyzeAll = async () => {
@@ -160,23 +229,37 @@ export default function CollabInbox() {
       const result = await cleanInbox(messagesToAnalyze);
 
       if (result?.analysis) {
-        const updatedMessages = messages.map(msg => {
+        const updatedMessages = await Promise.all(messages.map(async (msg) => {
           const analysis = result.analysis.find((a: { messageId: string }) => a.messageId === msg.id);
           if (analysis) {
+            const newPriority = analysis.priorityScore >= 7 ? "high" : analysis.priorityScore >= 4 ? "medium" : "low";
+            const aiAnalysis = {
+              priorityScore: analysis.priorityScore,
+              estimatedValue: analysis.estimatedValue,
+              recommendedAction: analysis.recommendedAction,
+              responseTemplate: analysis.responseTemplate,
+            };
+            
+            await updateInboxMessage(msg.id, { 
+              priority: newPriority,
+              ai_analysis: aiAnalysis as unknown as Json
+            });
+
             return {
               ...msg,
-              priority: analysis.priorityScore >= 7 ? "high" : analysis.priorityScore >= 4 ? "medium" : "low",
-              aiAnalysis: {
-                priorityScore: analysis.priorityScore,
-                estimatedValue: analysis.estimatedValue,
-                recommendedAction: analysis.recommendedAction,
-                responseTemplate: analysis.responseTemplate,
-              },
-            } as Message;
+              priority: newPriority as Message["priority"],
+              ai_analysis: aiAnalysis,
+            };
           }
           return msg;
-        });
+        }));
+
         setMessages(updatedMessages);
+        if (selectedMessage) {
+          const updated = updatedMessages.find(m => m.id === selectedMessage.id);
+          if (updated) setSelectedMessage(updated);
+        }
+
         toast({ 
           title: "Analysis complete!", 
           description: `${result.summary?.highPriority || 0} high priority messages found` 
@@ -189,6 +272,29 @@ export default function CollabInbox() {
     }
   };
 
+  const formatTimestamp = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffHours < 1) return "Just now";
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 1) return "Yesterday";
+    return `${diffDays} days ago`;
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
@@ -198,11 +304,11 @@ export default function CollabInbox() {
             <p className="text-muted-foreground mt-1">AI-sorted collaboration requests and brand messages</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="gap-2">
-              <Filter className="w-4 h-4" />
-              Sort by Value
+            <Button variant="outline" className="gap-2" onClick={loadMessages}>
+              <RefreshCw className="w-4 h-4" />
+              Refresh
             </Button>
-            <Button variant="default" className="gap-2" onClick={handleAnalyzeAll} disabled={isAnalyzing}>
+            <Button variant="default" className="gap-2" onClick={handleAnalyzeAll} disabled={isAnalyzing || messages.length === 0}>
               {isAnalyzing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -222,8 +328,14 @@ export default function CollabInbox() {
           {[
             { label: "New Messages", value: messages.filter(m => m.status === "new").length.toString(), icon: MessageSquare, color: "text-primary" },
             { label: "High Priority", value: messages.filter(m => m.priority === "high").length.toString(), icon: Star, color: "text-amber-500" },
-            { label: "Potential Revenue", value: "$23K", icon: DollarSign, color: "text-emerald-500" },
-            { label: "Response Rate", value: "94%", icon: CheckCircle2, color: "text-primary" },
+            { label: "Potential Revenue", value: `$${messages.reduce((sum, m) => {
+              if (m.budget) {
+                const match = m.budget.match(/\$?([\d,]+)/);
+                return sum + (match ? parseInt(match[1].replace(",", "")) : 0);
+              }
+              return sum;
+            }, 0).toLocaleString()}`, icon: DollarSign, color: "text-emerald-500" },
+            { label: "Response Rate", value: `${messages.length > 0 ? Math.round((messages.filter(m => m.status === "replied").length / messages.length) * 100) : 0}%`, icon: CheckCircle2, color: "text-primary" },
           ].map((stat) => (
             <div key={stat.label} className="bg-card border border-border rounded-2xl p-4">
               <div className="flex items-center gap-3">
@@ -244,6 +356,8 @@ export default function CollabInbox() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search messages..."
                   className="w-full h-10 pl-10 pr-4 rounded-xl bg-secondary border-none text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -272,58 +386,65 @@ export default function CollabInbox() {
             </div>
 
             <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
-              {filteredMessages.map((msg) => (
-                <button
-                  key={msg.id}
-                  onClick={() => setSelectedMessage(msg)}
-                  className={cn(
-                    "w-full p-4 text-left hover:bg-secondary/50 transition-colors",
-                    selectedMessage?.id === msg.id && "bg-primary/5",
-                    msg.status === "new" && "bg-primary/5"
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={cn("w-2 h-2 rounded-full mt-2", priorityColors[msg.priority])} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className={cn(
-                          "text-sm truncate",
-                          msg.status === "new" ? "font-semibold text-foreground" : "text-foreground"
-                        )}>
-                          {msg.company}
-                        </p>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {msg.timestamp}
-                        </span>
-                      </div>
-                      <p className="text-sm text-foreground truncate mt-0.5">{msg.subject}</p>
-                      <p className="text-xs text-muted-foreground truncate mt-1">{msg.preview}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className={cn("text-xs px-2 py-0.5 rounded-full", categoryColors[msg.category])}>
-                          {msg.category}
-                        </span>
-                        {msg.budget && (
-                          <span className="text-xs text-emerald-500">
-                            {msg.aiAnalysis?.estimatedValue || msg.budget}
+              {filteredMessages.length === 0 ? (
+                <div className="p-8 text-center">
+                  <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No messages found</p>
+                </div>
+              ) : (
+                filteredMessages.map((msg) => (
+                  <button
+                    key={msg.id}
+                    onClick={() => setSelectedMessage(msg)}
+                    className={cn(
+                      "w-full p-4 text-left hover:bg-secondary/50 transition-colors",
+                      selectedMessage?.id === msg.id && "bg-primary/5",
+                      msg.status === "new" && "bg-primary/5"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn("w-2 h-2 rounded-full mt-2", priorityColors[msg.priority])} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={cn(
+                            "text-sm truncate",
+                            msg.status === "new" ? "font-semibold text-foreground" : "text-foreground"
+                          )}>
+                            {msg.company}
+                          </p>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatTimestamp(msg.created_at)}
                           </span>
-                        )}
+                        </div>
+                        <p className="text-sm text-foreground truncate mt-0.5">{msg.subject}</p>
+                        <p className="text-xs text-muted-foreground truncate mt-1">{msg.preview}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={cn("text-xs px-2 py-0.5 rounded-full", categoryColors[msg.category])}>
+                            {msg.category}
+                          </span>
+                          {msg.budget && (
+                            <span className="text-xs text-emerald-500">
+                              {msg.ai_analysis?.estimatedValue || msg.budget}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleStar(msg.id);
+                        }}
+                        className="p-1"
+                      >
+                        <Star className={cn(
+                          "w-4 h-4",
+                          msg.starred ? "fill-amber-500 text-amber-500" : "text-muted-foreground"
+                        )} />
+                      </button>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleStar(msg.id);
-                      }}
-                      className="p-1"
-                    >
-                      <Star className={cn(
-                        "w-4 h-4",
-                        msg.starred ? "fill-amber-500 text-amber-500" : "text-muted-foreground"
-                      )} />
-                    </button>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
@@ -345,14 +466,11 @@ export default function CollabInbox() {
                       <h3 className="text-xl font-medium text-foreground mt-4">{selectedMessage.subject}</h3>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" onClick={() => handleArchiveMessage(selectedMessage.id)}>
                         <Archive className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteMessage(selectedMessage.id)}>
                         <Trash2 className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -366,7 +484,7 @@ export default function CollabInbox() {
                       <div>
                         <p className="text-muted-foreground">Est. Value</p>
                         <p className="font-semibold text-emerald-500">
-                          {selectedMessage.aiAnalysis?.estimatedValue || selectedMessage.budget || "TBD"}
+                          {selectedMessage.ai_analysis?.estimatedValue || selectedMessage.budget || "TBD"}
                         </p>
                       </div>
                       <div>
@@ -381,15 +499,15 @@ export default function CollabInbox() {
                           selectedMessage.priority === "medium" ? "text-amber-500" : "text-emerald-500"
                         )}>
                           {selectedMessage.priority}
-                          {selectedMessage.aiAnalysis?.priorityScore && ` (${selectedMessage.aiAnalysis.priorityScore}/10)`}
+                          {selectedMessage.ai_analysis?.priorityScore && ` (${selectedMessage.ai_analysis.priorityScore}/10)`}
                         </p>
                       </div>
                     </div>
-                    {selectedMessage.aiAnalysis?.recommendedAction && (
+                    {selectedMessage.ai_analysis?.recommendedAction && (
                       <div className="mt-3 pt-3 border-t border-primary/20">
                         <p className="text-xs text-muted-foreground">Recommended Action</p>
                         <p className="text-sm font-medium text-foreground capitalize">
-                          {selectedMessage.aiAnalysis.recommendedAction}
+                          {selectedMessage.ai_analysis.recommendedAction}
                         </p>
                       </div>
                     )}
@@ -397,24 +515,24 @@ export default function CollabInbox() {
                 </div>
 
                 <div className="flex-1 p-6 overflow-y-auto">
-                  <p className="text-foreground leading-relaxed">
-                    {selectedMessage.preview}
-                  </p>
-                  <p className="text-foreground leading-relaxed mt-4">
-                    We've been following your content for a while and really appreciate your authentic approach to lifestyle content. Your engagement rates are impressive and your audience demographics align perfectly with our target market.
-                  </p>
-                  <p className="text-foreground leading-relaxed mt-4">
-                    For this campaign, we're looking for 2 Instagram posts and 1 TikTok video. We're open to discussing your creative vision and rates. Let me know if you'd like to schedule a call to discuss further!
-                  </p>
-                  <p className="text-muted-foreground mt-4">
-                    Best regards,<br />
-                    {selectedMessage.sender}
+                  <p className="text-foreground leading-relaxed whitespace-pre-wrap">
+                    {selectedMessage.full_content || selectedMessage.preview}
                   </p>
                 </div>
 
                 <div className="p-6 border-t border-border">
                   <div className="flex gap-3">
-                    <Button variant="default" className="flex-1 gap-2">
+                    <Button 
+                      variant="default" 
+                      className="flex-1 gap-2"
+                      onClick={async () => {
+                        await updateInboxMessage(selectedMessage.id, { status: "replied" });
+                        setMessages(messages.map(m => 
+                          m.id === selectedMessage.id ? { ...m, status: "replied" as const } : m
+                        ));
+                        toast({ title: "Marked as replied!" });
+                      }}
+                    >
                       <CheckCircle2 className="w-4 h-4" />
                       Accept & Reply
                     </Button>
@@ -422,7 +540,11 @@ export default function CollabInbox() {
                       <Clock className="w-4 h-4" />
                       Negotiate
                     </Button>
-                    <Button variant="ghost" className="gap-2">
+                    <Button 
+                      variant="ghost" 
+                      className="gap-2"
+                      onClick={() => handleArchiveMessage(selectedMessage.id)}
+                    >
                       <XCircle className="w-4 h-4" />
                       Decline
                     </Button>
@@ -433,7 +555,10 @@ export default function CollabInbox() {
               <div className="h-full flex items-center justify-center text-center p-8">
                 <div>
                   <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">Select a message to view details</p>
+                  <h3 className="text-lg font-medium text-foreground mb-2">No message selected</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Select a message from the list to view details
+                  </p>
                 </div>
               </div>
             )}

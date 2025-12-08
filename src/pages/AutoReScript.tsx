@@ -13,10 +13,11 @@ import {
   FileText,
   Hash,
   MessageSquare,
-  Loader2
+  Loader2,
+  Save
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { rescriptVideo } from "@/lib/api";
+import { rescriptVideo, saveScript } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 
 interface GeneratedContent {
@@ -30,19 +31,20 @@ export default function AutoReScript() {
   const [videoUrl, setVideoUrl] = useState("");
   const [videoDescription, setVideoDescription] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [generated, setGenerated] = useState<GeneratedContent | null>(null);
   const [activeTab, setActiveTab] = useState<"script" | "hooks" | "captions" | "hashtags">("script");
 
   const handleGenerate = async () => {
-    if (!videoUrl.trim()) {
-      toast({ title: "Please enter a video URL", variant: "destructive" });
+    if (!videoUrl.trim() && !videoDescription.trim()) {
+      toast({ title: "Please enter a video URL or description", variant: "destructive" });
       return;
     }
 
     setIsProcessing(true);
     try {
       const result = await rescriptVideo({
-        videoUrl,
+        videoUrl: videoUrl || "content-idea",
         videoDescription,
       });
 
@@ -62,9 +64,64 @@ export default function AutoReScript() {
     }
   };
 
+  const handleSave = async () => {
+    if (!generated) return;
+
+    setIsSaving(true);
+    try {
+      await saveScript({
+        title: videoDescription || "ReScripted Content",
+        topic: videoUrl,
+        platform: "Multi-platform",
+        script_content: generated.script,
+        hooks: generated.hooks,
+        captions: generated.captions,
+        hashtags: generated.hashtags,
+      });
+      toast({ title: "Script saved to library!" });
+    } catch (error) {
+      console.error("Save error:", error);
+      toast({ title: "Error saving script", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: "Copied to clipboard!" });
+  };
+
+  const downloadContent = () => {
+    if (!generated) return;
+
+    const content = `
+# ReScripted Content
+Generated from: ${videoUrl || videoDescription}
+
+## Script
+${generated.script}
+
+## Hooks
+${generated.hooks.map((h, i) => `${i + 1}. ${h}`).join("\n")}
+
+## Captions
+${generated.captions.join("\n\n---\n\n")}
+
+## Hashtags
+${generated.hashtags.join(" ")}
+    `.trim();
+
+    const blob = new Blob([content], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "rescripted-content.md";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Content downloaded!" });
   };
 
   const tabs = [
@@ -106,7 +163,7 @@ export default function AutoReScript() {
                 size="lg" 
                 className="h-14 px-8 gap-2"
                 onClick={handleGenerate}
-                disabled={isProcessing || !videoUrl}
+                disabled={isProcessing || (!videoUrl && !videoDescription)}
               >
                 {isProcessing ? (
                   <>
@@ -122,19 +179,19 @@ export default function AutoReScript() {
               </Button>
             </div>
             <div>
-              <input
-                type="text"
+              <textarea
                 value={videoDescription}
                 onChange={(e) => setVideoDescription(e.target.value)}
-                placeholder="Optional: Describe your video topic for better results..."
-                className="w-full h-12 px-4 rounded-xl bg-secondary border-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Describe your video topic for better results... (e.g., 'Morning routine video for productivity')"
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl bg-secondary border-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
               />
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-4 mt-8 pt-8 border-t border-border">
             {[
-              { step: 1, label: "Paste URL" },
+              { step: 1, label: "Enter Details" },
               { step: 2, label: "AI Analyzes" },
               { step: 3, label: "Get Content" },
             ].map((item, index) => (
@@ -192,6 +249,14 @@ export default function AutoReScript() {
                         <Copy className="w-4 h-4" />
                         Copy
                       </Button>
+                      <Button variant="ghost" size="sm" className="gap-2" onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Save
+                      </Button>
+                      <Button variant="ghost" size="sm" className="gap-2" onClick={downloadContent}>
+                        <Download className="w-4 h-4" />
+                        Download All
+                      </Button>
                     </div>
                   </div>
                   <pre className="bg-secondary rounded-xl p-6 text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed">
@@ -204,22 +269,26 @@ export default function AutoReScript() {
                 <div className="space-y-4">
                   <h3 className="font-semibold text-foreground">Hook Variations</h3>
                   <div className="space-y-3">
-                    {generated.hooks.map((hook, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-4 bg-secondary rounded-xl group"
-                      >
-                        <p className="text-foreground">{hook}</p>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => copyToClipboard(hook)}
+                    {generated.hooks.length > 0 ? (
+                      generated.hooks.map((hook, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-4 bg-secondary rounded-xl group"
                         >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
+                          <p className="text-foreground">{hook}</p>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => copyToClipboard(hook)}
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground text-center py-8">No hooks generated</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -228,21 +297,25 @@ export default function AutoReScript() {
                 <div className="space-y-4">
                   <h3 className="font-semibold text-foreground">Caption Options</h3>
                   <div className="grid gap-4">
-                    {generated.captions.map((caption, index) => (
-                      <div key={index} className="p-4 bg-secondary rounded-xl group">
-                        <div className="flex items-start justify-between gap-4">
-                          <p className="text-sm text-foreground whitespace-pre-wrap">{caption}</p>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => copyToClipboard(caption)}
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
+                    {generated.captions.length > 0 ? (
+                      generated.captions.map((caption, index) => (
+                        <div key={index} className="p-4 bg-secondary rounded-xl group">
+                          <div className="flex items-start justify-between gap-4">
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{caption}</p>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => copyToClipboard(caption)}
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground text-center py-8">No captions generated</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -257,15 +330,19 @@ export default function AutoReScript() {
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {generated.hashtags.map((tag, index) => (
-                      <button
-                        key={index}
-                        onClick={() => copyToClipboard(tag)}
-                        className="px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium hover:bg-primary/20 transition-colors"
-                      >
-                        {tag}
-                      </button>
-                    ))}
+                    {generated.hashtags.length > 0 ? (
+                      generated.hashtags.map((tag, index) => (
+                        <button
+                          key={index}
+                          onClick={() => copyToClipboard(tag)}
+                          className="px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium hover:bg-primary/20 transition-colors"
+                        >
+                          {tag}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground text-center py-8 w-full">No hashtags generated</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -280,7 +357,7 @@ export default function AutoReScript() {
             </div>
             <h3 className="text-xl font-semibold text-foreground mb-2">Ready to ReScript</h3>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Paste a video URL above and let AI generate fresh content ideas based on your existing videos.
+              Paste a video URL or describe your content above and let AI generate fresh content ideas.
             </p>
           </div>
         )}

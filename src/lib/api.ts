@@ -132,6 +132,58 @@ export async function organizeIdeas(ideas: IdeaInput[]) {
   }
 }
 
+// Dashboard Stats
+export async function getDashboardStats() {
+  try {
+    // Get collabs stats
+    const { data: collabs, error: collabsError } = await supabase
+      .from("collabs")
+      .select("*");
+    if (collabsError) throw collabsError;
+
+    // Get ideas count
+    const { data: ideas, error: ideasError } = await supabase
+      .from("ideas")
+      .select("*");
+    if (ideasError) throw ideasError;
+
+    // Get content plans
+    const { data: contentPlans, error: plansError } = await supabase
+      .from("content_plans")
+      .select("*");
+    if (plansError) throw plansError;
+
+    // Get inbox messages
+    const { data: messages, error: messagesError } = await supabase
+      .from("inbox_messages")
+      .select("*");
+    if (messagesError) throw messagesError;
+
+    // Calculate stats
+    const activeCollabs = collabs?.filter(c => c.status !== "completed").length || 0;
+    const totalRevenue = collabs?.reduce((sum, c) => sum + (c.value || 0), 0) || 0;
+    const totalIdeas = ideas?.length || 0;
+    const newMessages = messages?.filter(m => m.status === "new").length || 0;
+
+    return {
+      collabs: collabs || [],
+      ideas: ideas || [],
+      contentPlans: contentPlans || [],
+      messages: messages || [],
+      stats: {
+        activeCollabs,
+        totalRevenue,
+        totalIdeas,
+        newMessages,
+        contentPlanCount: contentPlans?.length || 0,
+      }
+    };
+  } catch (error) {
+    handleApiError(error, "Dashboard stats");
+    return null;
+  }
+}
+
 // Database CRUD operations
 
 // Content Plans
@@ -453,4 +505,95 @@ export async function deleteWebsite(id: string) {
     .eq("id", id);
 
   if (error) throw error;
+}
+
+// HTML Export utility
+export function generateWebsiteHTML(website: {
+  name: string;
+  bio: string;
+  headline?: string;
+  about?: string;
+  links: { title: string; url: string }[];
+  services?: { name: string; price: string; description: string }[];
+  theme: string;
+}): string {
+  const isDark = website.theme === "dark" || website.theme === "gradient";
+  const bgColor = website.theme === "gradient" 
+    ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+    : website.theme === "dark" ? "#0f0f0f" : "#f5f5f5";
+  const textColor = isDark ? "#ffffff" : "#0f0f0f";
+  const mutedColor = isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.6)";
+  const cardBg = isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.9)";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${website.name} - Creator Website</title>
+  <meta name="description" content="${website.bio}">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: ${bgColor};
+      min-height: 100vh;
+      color: ${textColor};
+      padding: 2rem;
+    }
+    .container { max-width: 480px; margin: 0 auto; text-align: center; }
+    .avatar {
+      width: 96px; height: 96px; border-radius: 50%;
+      background: #667eea; margin: 0 auto 1rem;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.5rem; font-weight: bold; color: white;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .headline { font-size: 1.1rem; margin-bottom: 0.5rem; }
+    .bio { color: ${mutedColor}; margin-bottom: 2rem; font-size: 0.9rem; }
+    .links { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 2rem; }
+    .link-btn {
+      display: block; padding: 1rem; background: ${cardBg};
+      border-radius: 12px; text-decoration: none; color: ${textColor};
+      font-weight: 500; transition: transform 0.2s, opacity 0.2s;
+    }
+    .link-btn:hover { transform: scale(1.02); opacity: 0.9; }
+    .services { margin-top: 2rem; }
+    .services h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: ${mutedColor}; margin-bottom: 1rem; }
+    .service-card { background: ${cardBg}; border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem; text-align: left; }
+    .service-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .service-name { font-weight: 600; }
+    .service-price { font-weight: 700; color: #667eea; }
+    .service-desc { font-size: 0.8rem; color: ${mutedColor}; }
+    .footer { margin-top: 3rem; font-size: 0.75rem; color: ${mutedColor}; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="avatar">${website.name.charAt(0).toUpperCase()}</div>
+    <h1>${website.name}</h1>
+    ${website.headline ? `<p class="headline">${website.headline}</p>` : ""}
+    <p class="bio">${website.bio}</p>
+    
+    <div class="links">
+      ${website.links.map(link => `<a href="${link.url}" class="link-btn" target="_blank">${link.title}</a>`).join("\n      ")}
+    </div>
+    
+    ${website.services && website.services.length > 0 ? `
+    <div class="services">
+      <h2>Services</h2>
+      ${website.services.map(s => `
+      <div class="service-card">
+        <div class="service-header">
+          <span class="service-name">${s.name}</span>
+          <span class="service-price">${s.price}</span>
+        </div>
+        <p class="service-desc">${s.description}</p>
+      </div>`).join("")}
+    </div>` : ""}
+    
+    <p class="footer">Made with CreatorOS</p>
+  </div>
+</body>
+</html>`;
 }
