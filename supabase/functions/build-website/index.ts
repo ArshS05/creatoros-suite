@@ -11,14 +11,28 @@ serve(async (req) => {
   }
 
   try {
-    const { username, style, sections } = await req.json();
+    const { 
+      username, 
+      style, 
+      sections,
+      businessName,
+      businessType,
+      colorTheme,
+      fontStyle,
+      features
+    } = await req.json();
+    
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log(`Building website for Instagram user: ${username}`);
+    console.log(`Building website for: ${username || businessName}`);
+    console.log(`Style: ${style}, ColorTheme: ${colorTheme}, Font: ${fontStyle}`);
+
+    const sectionsRequested = sections?.join(', ') || 'Hero, About, Services, Testimonials, Contact';
+    const featuresRequested = features?.join(', ') || 'Responsive design, Smooth animations, Contact form';
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -31,48 +45,108 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a personal branding expert and web designer. You create compelling personal websites for content creators based on their Instagram presence. Generate professional, engaging content that converts visitors into followers and customers. Always respond with valid JSON.`
+            content: `You are an expert personal branding specialist, web designer, and copywriter. You create stunning, high-converting personal websites for content creators and businesses. 
+
+Your websites feature:
+- Compelling, benefit-focused copy that converts visitors into followers/customers
+- Modern, aesthetic design with attention to visual hierarchy
+- Strategic section placement for maximum engagement
+- SEO-optimized content with proper meta descriptions
+
+You MUST respond with ONLY valid JSON, no markdown, no explanation, just the JSON object.`
           },
           {
             role: "user",
-            content: `Create website content for Instagram creator @${username}.
+            content: `Create comprehensive website content for "${businessName || username}".
 
-Style preference: ${style || 'Modern and minimal'}
-Sections requested: ${sections?.join(', ') || 'Profile, Links, Content Grid, Services, Contact'}
+CONTEXT:
+- Business/Creator Type: ${businessType || 'Content Creator'}
+- Design Style: ${style || 'Modern and minimal'}
+- Color Theme Preference: ${colorTheme || 'Dark professional'}
+- Font Style: ${fontStyle || 'Clean sans-serif'}
+- Sections to include: ${sectionsRequested}
+- Features requested: ${featuresRequested}
 
-Generate:
-1. Professional bio (2-3 sentences)
-2. Tagline/headline
-3. About section (paragraph)
-4. 4 link button suggestions with titles
-5. 3 service offerings with names, prices, and descriptions
-6. Contact form intro text
-7. SEO meta title and description
-8. Color scheme suggestion
+Generate DETAILED, PROFESSIONAL content. Be specific, avoid generic filler text.
 
-Return as JSON:
+REQUIRED OUTPUT - Return ONLY this JSON structure:
 {
   "website": {
-    "name": "Creator Name",
-    "headline": "Short catchy tagline",
-    "bio": "Professional bio text...",
-    "about": "Longer about section...",
+    "name": "Full Professional Name/Brand",
+    "headline": "Powerful 5-10 word value proposition",
+    "subheadline": "Supporting statement that expands on the headline",
+    "bio": "2-3 compelling sentences about expertise and unique value",
+    "about": {
+      "title": "About section heading",
+      "content": "3-4 paragraphs telling the brand story, journey, mission, and what makes them unique",
+      "highlights": ["Key achievement 1", "Key achievement 2", "Key achievement 3", "Key achievement 4"]
+    },
     "links": [
-      { "title": "Link 1", "url": "#", "icon": "youtube" },
-      { "title": "Link 2", "url": "#", "icon": "tiktok" }
+      { "title": "Primary CTA Button", "url": "#contact", "icon": "arrow-right", "isPrimary": true },
+      { "title": "YouTube Channel", "url": "#", "icon": "youtube" },
+      { "title": "Latest Podcast", "url": "#", "icon": "headphones" },
+      { "title": "Free Resources", "url": "#", "icon": "gift" },
+      { "title": "Book a Call", "url": "#", "icon": "calendar" }
     ],
     "services": [
-      { "name": "Service 1", "price": "$99", "description": "..." }
+      { 
+        "name": "Premium Service Name", 
+        "price": "$XXX", 
+        "description": "Detailed 2-sentence description of what's included and the transformation/outcome",
+        "features": ["Feature 1", "Feature 2", "Feature 3"],
+        "popular": true
+      },
+      { 
+        "name": "Mid-Tier Service", 
+        "price": "$XXX", 
+        "description": "Clear description of value provided",
+        "features": ["Feature 1", "Feature 2", "Feature 3"],
+        "popular": false
+      },
+      { 
+        "name": "Entry Service", 
+        "price": "$XXX", 
+        "description": "Perfect starting point description",
+        "features": ["Feature 1", "Feature 2"],
+        "popular": false
+      }
     ],
-    "contactIntro": "Let's work together...",
+    "testimonials": [
+      { "name": "Client Name", "role": "Their Title/Company", "content": "Detailed testimonial quote about results achieved", "avatar": "J" },
+      { "name": "Client Name", "role": "Their Title", "content": "Another compelling testimonial", "avatar": "S" },
+      { "name": "Client Name", "role": "Their Role", "content": "Third testimonial focusing on different benefit", "avatar": "M" }
+    ],
+    "features": [
+      { "icon": "zap", "title": "Key Benefit 1", "description": "Brief explanation" },
+      { "icon": "shield", "title": "Key Benefit 2", "description": "Brief explanation" },
+      { "icon": "heart", "title": "Key Benefit 3", "description": "Brief explanation" },
+      { "icon": "trending-up", "title": "Key Benefit 4", "description": "Brief explanation" }
+    ],
+    "contactIntro": "Compelling call-to-action paragraph inviting visitors to get in touch",
+    "contactFormFields": ["name", "email", "message"],
+    "socialLinks": {
+      "instagram": "https://instagram.com/username",
+      "youtube": "https://youtube.com/@channel",
+      "tiktok": "https://tiktok.com/@username",
+      "twitter": "https://twitter.com/username"
+    },
     "seo": {
-      "title": "...",
-      "description": "..."
+      "title": "60-character SEO title with main keyword",
+      "description": "155-character meta description that encourages clicks",
+      "keywords": ["keyword1", "keyword2", "keyword3"]
     },
     "colorScheme": {
-      "primary": "#...",
-      "secondary": "#...",
-      "accent": "#..."
+      "primary": "#6366f1",
+      "secondary": "#8b5cf6",
+      "accent": "#06b6d4",
+      "background": "#0f172a",
+      "surface": "#1e293b",
+      "text": "#f8fafc",
+      "muted": "#94a3b8"
+    },
+    "typography": {
+      "heading": "Inter",
+      "body": "Inter"
     }
   }
 }`
@@ -86,13 +160,13 @@ Return as JSON:
       console.error("AI gateway error:", response.status, errorText);
       
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Usage limit reached. Please add credits." }), {
+        return new Response(JSON.stringify({ error: "Usage limit reached. Please add credits to continue." }), {
           status: 402,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -103,18 +177,24 @@ Return as JSON:
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     
+    console.log("Raw AI response length:", content?.length);
+    
     let result;
     try {
+      // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
       } else {
+        console.error("No JSON found in response");
         result = { rawContent: content };
       }
-    } catch {
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
       result = { rawContent: content };
     }
 
+    console.log("Successfully generated website content");
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
