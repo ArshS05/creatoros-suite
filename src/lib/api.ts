@@ -32,8 +32,13 @@ interface InboxMessage {
 
 interface WebsiteRequest {
   username: string;
+  businessName?: string;
+  businessType?: string;
   style?: string;
+  colorTheme?: string;
+  fontStyle?: string;
   sections?: string[];
+  features?: string[];
 }
 
 interface IdeaInput {
