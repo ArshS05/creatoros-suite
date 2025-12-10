@@ -11,6 +11,7 @@ import WebsiteBuilder from "./pages/WebsiteBuilder";
 import CollabInbox from "./pages/CollabInbox";
 import CollabTracker from "./pages/CollabTracker";
 import Settings from "./pages/Settings";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/inbox" element={<CollabInbox />} />
           <Route path="/tracker" element={<CollabTracker />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

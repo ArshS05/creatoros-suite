@@ -17,6 +17,7 @@ serve(async (req) => {
       audience = "General audience", 
       goal = "Growth", 
       experience = "Intermediate",
+      numberOfDays = 14,
       regenerateDay = null 
     } = await req.json();
 
@@ -26,9 +27,9 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log(`Generating content plan for niche: ${niche}, type: ${contentType}, goal: ${goal}`);
+    console.log(`Generating content plan for niche: ${niche}, type: ${contentType}, goal: ${goal}, days: ${numberOfDays}`);
 
-    const systemPrompt = `You are a Content Strategist AI creating targeted 30-day content calendars. Output ONLY valid JSON - no markdown, no code blocks, no explanations.`;
+    const systemPrompt = `You are a Content Strategist AI creating targeted content calendars. Output ONLY valid JSON - no markdown, no code blocks, no explanations.`;
 
     let userPrompt = "";
     
@@ -39,7 +40,7 @@ Niche: ${niche} | Type: ${contentType} | Audience: ${audience} | Goal: ${goal}
 Return ONLY this JSON (no markdown):
 {"day":${regenerateDay},"idea":"specific idea","hook":"3-sec hook","format":"format type","caption":"caption with emojis","hashtags":["tag1","tag2","tag3","tag4","tag5"],"postingTime":"Day Time","engagementStrategy":"CTA strategy"}`;
     } else {
-      userPrompt = `Create 30-day content calendar:
+      userPrompt = `Create ${numberOfDays}-day content calendar:
 Niche: ${niche}
 Type: ${contentType}
 Audience: ${audience}
@@ -53,7 +54,7 @@ RULES:
 - Short captions (under 150 chars)
 
 Return ONLY valid JSON array (no markdown, no code blocks):
-{"days":[{"day":1,"idea":"specific idea","hook":"attention hook","format":"content format","caption":"short caption","hashtags":["tag1","tag2","tag3","tag4","tag5"],"postingTime":"Day Time EST","engagementStrategy":"CTA tip"},{"day":2,...},...all 30 days]}`;
+{"days":[{"day":1,"idea":"specific idea","hook":"attention hook","format":"content format","caption":"short caption","hashtags":["tag1","tag2","tag3","tag4","tag5"],"postingTime":"Day Time EST","engagementStrategy":"CTA tip"},{"day":2,...},...all ${numberOfDays} days]}`;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
