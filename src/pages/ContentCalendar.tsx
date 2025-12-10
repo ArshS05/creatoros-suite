@@ -3,55 +3,31 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { 
   Calendar, 
-  ChevronLeft, 
-  ChevronRight, 
   Sparkles, 
-  Instagram, 
-  Youtube, 
-  Music2,
-  Filter,
   Download,
-  Loader2
+  Loader2,
+  LayoutGrid,
+  CalendarDays,
+  FileText,
+  Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { generateContentPlan, saveContentPlan, getContentPlans } from "@/lib/api";
+import { saveContentPlan, getContentPlans, deleteContentPlan } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { ContentSetupModal, ContentSetupParams } from "@/components/calendar/ContentSetupModal";
+import { ContentDayCard, ContentDay } from "@/components/calendar/ContentDayCard";
 
-const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-interface ContentItem {
-  id: string;
-  title: string;
-  platform: "instagram" | "youtube" | "tiktok";
-  time: string;
-  status: "scheduled" | "draft" | "published";
-}
-
-const platformIcons = {
-  instagram: Instagram,
-  youtube: Youtube,
-  tiktok: Music2,
-};
-
-const platformColors = {
-  instagram: "bg-gradient-to-br from-pink-500 to-orange-400",
-  youtube: "bg-red-500",
-  tiktok: "bg-foreground",
-};
+type ViewMode = "grid" | "calendar" | "list";
 
 export default function ContentCalendar() {
-  const [currentDate] = useState(new Date());
-  const [selectedNiche, setSelectedNiche] = useState("");
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["Instagram", "YouTube", "TikTok"]);
-  const [selectedStyle, setSelectedStyle] = useState("Mixed");
   const [showGenerator, setShowGenerator] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [calendarContent, setCalendarContent] = useState<Record<number, ContentItem[]>>({});
-
-  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
-  const adjustedFirstDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
-  const monthName = currentDate.toLocaleString("default", { month: "long", year: "numeric" });
+  const [regeneratingDay, setRegeneratingDay] = useState<number | null>(null);
+  const [contentDays, setContentDays] = useState<ContentDay[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [currentParams, setCurrentParams] = useState<ContentSetupParams | null>(null);
+  const [savedPlans, setSavedPlans] = useState<Array<{ id: string; niche: string; created_at: string }>>([]);
 
   useEffect(() => {
     loadSavedPlans();
@@ -61,22 +37,17 @@ export default function ContentCalendar() {
     try {
       const plans = await getContentPlans();
       if (plans && plans.length > 0) {
+        setSavedPlans(plans.map(p => ({ 
+          id: p.id, 
+          niche: p.niche, 
+          created_at: p.created_at 
+        })));
+        
+        // Load the latest plan
         const latestPlan = plans[0];
-        const planData = latestPlan.plan as Array<{ day: number; title: string; platform: string; postingTime: string }>;
-        if (Array.isArray(planData)) {
-          const content: Record<number, ContentItem[]> = {};
-          planData.forEach((item) => {
-            const platformLower = item.platform?.toLowerCase() as "instagram" | "youtube" | "tiktok";
-            if (!content[item.day]) content[item.day] = [];
-            content[item.day].push({
-              id: `saved-${item.day}-${content[item.day].length}`,
-              title: item.title,
-              platform: platformLower || "instagram",
-              time: item.postingTime || "12:00 PM",
-              status: "draft",
-            });
-          });
-          setCalendarContent(content);
+        const planData = latestPlan.plan as unknown;
+        if (Array.isArray(planData) && planData.length > 0 && typeof planData[0] === 'object' && planData[0] !== null && 'idea' in planData[0]) {
+          setContentDays(planData as ContentDay[]);
         }
       }
     } catch (error) {
@@ -84,60 +55,141 @@ export default function ContentCalendar() {
     }
   };
 
-  const togglePlatform = (platform: string) => {
-    setSelectedPlatforms(prev => 
-      prev.includes(platform) 
-        ? prev.filter(p => p !== platform)
-        : [...prev, platform]
-    );
-  };
-
-  const handleGenerate = async () => {
-    if (!selectedNiche.trim()) {
-      toast({ title: "Please enter your niche", variant: "destructive" });
-      return;
-    }
-
+  const handleGenerate = async (params: ContentSetupParams) => {
     setIsGenerating(true);
+    setCurrentParams(params);
+    
     try {
-      const result = await generateContentPlan({
-        niche: selectedNiche,
-        platforms: selectedPlatforms,
-        style: selectedStyle,
-        days: 30,
+      const { data, error } = await supabase.functions.invoke('generate-content-plan', {
+        body: params
       });
 
-      if (result?.plan) {
-        const newContent: Record<number, ContentItem[]> = {};
-        result.plan.forEach((item: { day: number; title: string; platform: string; postingTime: string }) => {
-          const platformLower = item.platform?.toLowerCase() as "instagram" | "youtube" | "tiktok";
-          if (!newContent[item.day]) newContent[item.day] = [];
-          newContent[item.day].push({
-            id: `gen-${item.day}-${newContent[item.day].length}`,
-            title: item.title,
-            platform: platformLower || "instagram",
-            time: item.postingTime || "12:00 PM",
-            status: "draft",
-          });
-        });
-        setCalendarContent(newContent);
+      if (error) {
+        throw error;
+      }
 
+      if (data?.error) {
+        toast({ 
+          title: "Generation failed", 
+          description: data.error, 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      if (data?.days && Array.isArray(data.days)) {
+        setContentDays(data.days);
+        
         // Save to database
         await saveContentPlan({
-          niche: selectedNiche,
-          platforms: selectedPlatforms,
-          style: selectedStyle,
-          plan: result.plan,
+          niche: params.niche,
+          platforms: [params.contentType],
+          style: `${params.goal} - ${params.experience}`,
+          plan: data.days,
         });
 
-        toast({ title: "Content plan generated & saved!", description: "30-day plan added to calendar" });
+        await loadSavedPlans();
+        toast({ 
+          title: "30-Day Plan Generated!", 
+          description: `Created ${data.days.length} days of content for ${params.niche}` 
+        });
+        setShowGenerator(false);
+      } else {
+        throw new Error("Invalid response format");
       }
-      setShowGenerator(false);
     } catch (error) {
       console.error("Generation error:", error);
+      toast({ 
+        title: "Generation failed", 
+        description: "Please try again", 
+        variant: "destructive" 
+      });
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleRegenerateDay = async (day: number) => {
+    if (!currentParams) {
+      toast({ 
+        title: "Missing context", 
+        description: "Please generate a full plan first", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setRegeneratingDay(day);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-content-plan', {
+        body: { ...currentParams, regenerateDay: day }
+      });
+
+      if (error) throw error;
+
+      if (data && !data.error) {
+        setContentDays(prev => prev.map(d => d.day === day ? { ...data, day } : d));
+        toast({ title: `Day ${day} regenerated!` });
+      }
+    } catch (error) {
+      console.error("Regeneration error:", error);
+      toast({ 
+        title: "Regeneration failed", 
+        description: "Please try again", 
+        variant: "destructive" 
+      });
+    } finally {
+      setRegeneratingDay(null);
+    }
+  };
+
+  const handleDeletePlan = async (planId: string) => {
+    try {
+      await deleteContentPlan(planId);
+      await loadSavedPlans();
+      if (savedPlans.length === 1) {
+        setContentDays([]);
+      }
+      toast({ title: "Plan deleted" });
+    } catch (error) {
+      console.error("Delete error:", error);
+    }
+  };
+
+  const exportPlan = () => {
+    if (contentDays.length === 0) {
+      toast({ title: "No content to export", variant: "destructive" });
+      return;
+    }
+
+    let content = `# 30-Day Content Calendar\n\n`;
+    content += `Generated for: ${currentParams?.niche || 'Your Niche'}\n`;
+    content += `Content Type: ${currentParams?.contentType || 'Mixed'}\n`;
+    content += `Goal: ${currentParams?.goal || 'Growth'}\n\n`;
+    content += `---\n\n`;
+
+    contentDays.forEach(day => {
+      content += `## Day ${day.day}\n\n`;
+      content += `**💡 Idea:** ${day.idea}\n\n`;
+      content += `**🎣 Hook:** ${day.hook}\n\n`;
+      content += `**📱 Format:** ${day.format}\n\n`;
+      content += `**📝 Caption:**\n${day.caption}\n\n`;
+      content += `**#️⃣ Hashtags:** ${day.hashtags.join(' ')}\n\n`;
+      content += `**⏰ Best Time:** ${day.postingTime}\n\n`;
+      content += `**🎯 Engagement Strategy:** ${day.engagementStrategy}\n\n`;
+      content += `---\n\n`;
+    });
+
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `content-calendar-${currentParams?.niche?.replace(/\s+/g, '-') || 'plan'}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast({ title: "Calendar exported!", description: "Downloaded as Markdown file" });
   };
 
   return (
@@ -147,195 +199,187 @@ export default function ContentCalendar() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Content Calendar</h1>
-            <p className="text-muted-foreground mt-1">Plan and schedule your content across all platforms</p>
+            <p className="text-muted-foreground mt-1">AI-powered 30-day content planning</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="gap-2">
-              <Filter className="w-4 h-4" />
-              Filter
-            </Button>
-            <Button variant="outline" className="gap-2">
+            {/* View Toggle */}
+            <div className="flex bg-secondary rounded-xl p-1">
+              {[
+                { mode: "grid" as ViewMode, icon: LayoutGrid },
+                { mode: "calendar" as ViewMode, icon: CalendarDays },
+                { mode: "list" as ViewMode, icon: FileText },
+              ].map(({ mode, icon: Icon }) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={cn(
+                    "p-2 rounded-lg transition-colors",
+                    viewMode === mode 
+                      ? "bg-background text-foreground shadow-sm" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                </button>
+              ))}
+            </div>
+            
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={exportPlan}
+              disabled={contentDays.length === 0}
+            >
               <Download className="w-4 h-4" />
               Export
             </Button>
-            <Button variant="default" className="gap-2" onClick={() => setShowGenerator(true)}>
+            <Button 
+              className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70" 
+              onClick={() => setShowGenerator(true)}
+            >
               <Sparkles className="w-4 h-4" />
-              AI Generate 30-Day Plan
+              Generate Plan
             </Button>
           </div>
         </div>
 
-        {/* AI Generator Modal */}
-        {showGenerator && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
-            <div className="bg-card border border-border rounded-3xl p-8 max-w-lg w-full mx-4 shadow-xl">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 rounded-xl bg-foreground">
-                  <Sparkles className="w-6 h-6 text-background" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">AI Content Generator</h2>
-                  <p className="text-sm text-muted-foreground">Generate a 30-day content plan</p>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Your Niche</label>
-                  <input
-                    type="text"
-                    value={selectedNiche}
-                    onChange={(e) => setSelectedNiche(e.target.value)}
-                    placeholder="e.g., Fitness, Beauty, Tech, Gaming..."
-                    className="w-full h-12 px-4 rounded-xl bg-secondary border-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Platforms</label>
-                  <div className="flex gap-2">
-                    {["Instagram", "YouTube", "TikTok"].map((platform) => (
-                      <button
-                        key={platform}
-                        onClick={() => togglePlatform(platform)}
-                        className={cn(
-                          "flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-colors border-2",
-                          selectedPlatforms.includes(platform)
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-secondary hover:bg-secondary/80 text-foreground border-transparent"
-                        )}
-                      >
-                        {platform}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+        {/* Setup Modal */}
+        <ContentSetupModal
+          isOpen={showGenerator}
+          onClose={() => setShowGenerator(false)}
+          onGenerate={handleGenerate}
+          isGenerating={isGenerating}
+        />
 
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Content Style</label>
-                  <select 
-                    value={selectedStyle}
-                    onChange={(e) => setSelectedStyle(e.target.value)}
-                    className="w-full h-12 px-4 rounded-xl bg-secondary border-none text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option>Educational</option>
-                    <option>Entertainment</option>
-                    <option>Lifestyle</option>
-                    <option>Mixed</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-8">
-                <Button variant="outline" className="flex-1" onClick={() => setShowGenerator(false)} disabled={isGenerating}>
-                  Cancel
-                </Button>
-                <Button variant="default" className="flex-1 gap-2" onClick={handleGenerate} disabled={isGenerating}>
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      Generate Plan
-                    </>
-                  )}
-                </Button>
-              </div>
+        {/* Empty State */}
+        {contentDays.length === 0 && (
+          <div className="bg-card border border-border rounded-3xl p-12 text-center">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mx-auto mb-6">
+              <Calendar className="w-10 h-10 text-primary" />
             </div>
+            <h2 className="text-2xl font-bold text-foreground mb-2">No Content Plan Yet</h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Generate a personalized 30-day content calendar tailored to your niche, audience, and goals.
+            </p>
+            <Button 
+              size="lg"
+              className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+              onClick={() => setShowGenerator(true)}
+            >
+              <Sparkles className="w-5 h-5" />
+              Generate 30-Day Plan
+            </Button>
           </div>
         )}
 
-        {/* Calendar */}
-        <div className="bg-card rounded-3xl border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1">
-                <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
-                  <ChevronLeft className="w-5 h-5 text-muted-foreground" />
-                </button>
-                <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
-                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                </button>
-              </div>
-              <h2 className="text-xl font-semibold text-foreground">{monthName}</h2>
-            </div>
-            <Button variant="ghost" size="sm" className="gap-2">
-              <Calendar className="w-4 h-4" />
-              Today
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-2 mb-2">
-            {weekDays.map((day) => (
-              <div key={day} className="text-center py-2 text-sm font-medium text-muted-foreground">
-                {day}
-              </div>
+        {/* Content Grid View */}
+        {contentDays.length > 0 && viewMode === "grid" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {contentDays.map((day) => (
+              <ContentDayCard
+                key={day.day}
+                content={day}
+                onRegenerate={handleRegenerateDay}
+                isRegenerating={regeneratingDay === day.day}
+              />
             ))}
           </div>
+        )}
 
-          <div className="grid grid-cols-7 gap-2">
-            {Array.from({ length: adjustedFirstDay }).map((_, index) => (
-              <div key={`empty-${index}`} className="h-32 rounded-xl bg-secondary/30" />
-            ))}
-            
-            {Array.from({ length: daysInMonth }).map((_, index) => {
-              const day = index + 1;
-              const content = calendarContent[day] || [];
-              const isToday = day === currentDate.getDate();
-              
-              return (
-                <div
-                  key={day}
-                  className={cn(
-                    "h-32 rounded-xl border p-2 transition-colors cursor-pointer hover:border-primary/50",
-                    isToday ? "border-primary bg-primary/5" : "border-border bg-secondary/20"
-                  )}
-                >
-                  <span className={cn(
-                    "inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium",
-                    isToday ? "bg-primary text-primary-foreground" : "text-foreground"
-                  )}>
-                    {day}
-                  </span>
-                  <div className="mt-1 space-y-1">
-                    {content.slice(0, 2).map((item) => {
-                      const Icon = platformIcons[item.platform];
-                      return (
-                        <div
-                          key={item.id}
-                          className={cn(
-                            "flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-white truncate",
-                            platformColors[item.platform]
-                          )}
-                        >
-                          <Icon className="w-3 h-3 flex-shrink-0" />
-                          <span className="truncate">{item.title}</span>
-                        </div>
-                      );
-                    })}
-                    {content.length > 2 && (
-                      <div className="text-xs text-muted-foreground pl-2">
-                        +{content.length - 2} more
-                      </div>
-                    )}
-                  </div>
+        {/* Calendar View */}
+        {contentDays.length > 0 && viewMode === "calendar" && (
+          <div className="bg-card border border-border rounded-3xl p-6">
+            <div className="grid grid-cols-7 gap-2 mb-2">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                <div key={day} className="text-center py-2 text-sm font-medium text-muted-foreground">
+                  {day}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6">
-          {Object.entries(platformColors).map(([platform, color]) => (
-            <div key={platform} className="flex items-center gap-2">
-              <div className={cn("w-3 h-3 rounded-full", color)} />
-              <span className="text-sm text-muted-foreground capitalize">{platform}</span>
+              ))}
             </div>
-          ))}
-        </div>
+            <div className="grid grid-cols-7 gap-2">
+              {contentDays.slice(0, 28).map((content) => (
+                <div
+                  key={content.day}
+                  className="h-32 rounded-xl border border-border bg-secondary/20 p-2 hover:border-primary/50 transition-colors cursor-pointer group"
+                  title={content.idea}
+                >
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                    {content.day}
+                  </span>
+                  <p className="mt-1 text-xs text-foreground line-clamp-3">{content.idea}</p>
+                </div>
+              ))}
+            </div>
+            {contentDays.length > 28 && (
+              <div className="grid grid-cols-7 gap-2 mt-2">
+                {contentDays.slice(28).map((content) => (
+                  <div
+                    key={content.day}
+                    className="h-32 rounded-xl border border-border bg-secondary/20 p-2 hover:border-primary/50 transition-colors cursor-pointer group"
+                    title={content.idea}
+                  >
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      {content.day}
+                    </span>
+                    <p className="mt-1 text-xs text-foreground line-clamp-3">{content.idea}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* List View */}
+        {contentDays.length > 0 && viewMode === "list" && (
+          <div className="space-y-3">
+            {contentDays.map((day) => (
+              <div 
+                key={day.day}
+                className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4 hover:border-primary/30 transition-colors"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-bold text-lg flex-shrink-0">
+                  {day.day}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-foreground truncate">{day.idea}</h3>
+                  <p className="text-sm text-muted-foreground truncate">{day.hook}</p>
+                </div>
+                <span className="px-3 py-1.5 bg-primary/10 text-primary text-xs font-medium rounded-lg flex-shrink-0">
+                  {day.format}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Saved Plans */}
+        {savedPlans.length > 0 && (
+          <div className="bg-card border border-border rounded-3xl p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Saved Plans</h2>
+            <div className="space-y-2">
+              {savedPlans.map((plan) => (
+                <div 
+                  key={plan.id}
+                  className="flex items-center justify-between p-3 bg-secondary/30 rounded-xl"
+                >
+                  <div>
+                    <p className="font-medium text-foreground">{plan.niche}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(plan.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeletePlan(plan.id)}
+                  >
+                    <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
