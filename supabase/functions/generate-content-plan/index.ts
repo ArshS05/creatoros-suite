@@ -28,100 +28,32 @@ serve(async (req) => {
 
     console.log(`Generating content plan for niche: ${niche}, type: ${contentType}, goal: ${goal}`);
 
-    const systemPrompt = `You are a Content Strategist AI who creates ultra-targeted, trend-aware, platform-optimized 30-day content calendars.
-
-You are an expert in:
-- Social media algorithms and what content performs best
-- Trending topics and trendjacking strategies
-- Hook psychology and attention-grabbing techniques
-- Platform-specific formatting (Reels, Shorts, Carousels, Long-form, X Posts)
-- Engagement optimization and community building
-- Hashtag research and strategic tagging
-
-Your responsibilities:
-1. Analyze top-performing trends in this niche (trendjacking opportunities)
-2. Provide platform-specific formatting ideas based on content type
-3. Create highly specific, non-generic content ideas
-4. Each day must be unique - NO repeated ideas or similar concepts
-5. Ideas must be actionable, specific, and designed for high performance
-6. Include psychological hooks that stop the scroll
-7. Provide strategic posting times based on platform and audience behavior
-
-CRITICAL: Generate DETAILED, SPECIFIC content. No generic advice. Each idea should feel like it was researched specifically for this niche.`;
+    const systemPrompt = `You are a Content Strategist AI creating targeted 30-day content calendars. Output ONLY valid JSON - no markdown, no code blocks, no explanations.`;
 
     let userPrompt = "";
     
     if (regenerateDay !== null) {
-      userPrompt = `Regenerate ONLY day ${regenerateDay} of a content calendar for:
-- Niche: ${niche}
-- Content Type: ${contentType}
-- Target Audience: ${audience}
-- Goal: ${goal}
-- Experience Level: ${experience}
+      userPrompt = `Create ONE content day for:
+Niche: ${niche} | Type: ${contentType} | Audience: ${audience} | Goal: ${goal}
 
-Create a FRESH, UNIQUE idea that is different from typical content in this niche. Be creative and specific.
-
-Output strictly in JSON:
-{
-  "day": ${regenerateDay},
-  "idea": "Specific, detailed content idea",
-  "hook": "Attention-grabbing first 3 seconds script",
-  "format": "Specific format recommendation",
-  "caption": "Full caption with emojis, story, and CTA",
-  "hashtags": ["10-20 niche-specific hashtags"],
-  "postingTime": "Optimal time with timezone consideration",
-  "engagementStrategy": "Specific CTA, comment bait, share incentive strategy"
-}`;
+Return ONLY this JSON (no markdown):
+{"day":${regenerateDay},"idea":"specific idea","hook":"3-sec hook","format":"format type","caption":"caption with emojis","hashtags":["tag1","tag2","tag3","tag4","tag5"],"postingTime":"Day Time","engagementStrategy":"CTA strategy"}`;
     } else {
-      userPrompt = `Create a HIGHLY detailed 30-day content calendar for:
+      userPrompt = `Create 30-day content calendar:
+Niche: ${niche}
+Type: ${contentType}
+Audience: ${audience}
+Goal: ${goal}
+Level: ${experience}
 
-**Inputs:**
-- Niche: ${niche}
-- Content Type: ${contentType}
-- Target Audience: ${audience}
-- Content Goal: ${goal}
-- Experience Level: ${experience}
+RULES:
+- Each day unique, no repeats
+- Specific ideas, not generic
+- 5 hashtags per day (no # symbol)
+- Short captions (under 150 chars)
 
-**Your Task:**
-Generate 30 days of content where each day includes:
-
-1. **idea**: A specific, unique content idea (not generic). Include the exact angle, story, or approach.
-2. **hook**: The first 3 seconds - what will you say/show to stop the scroll? Be specific.
-3. **format**: Exact format based on content type (e.g., "Talking head with B-roll", "Text overlay Reel", "Carousel with 7 slides")
-4. **caption**: Full caption (150-300 characters) with storytelling, emojis, and clear CTA
-5. **hashtags**: Array of 10-20 highly relevant, niche-specific hashtags (mix of popular and niche)
-6. **postingTime**: Best time to post (e.g., "Tuesday 7:00 PM EST - peak engagement for ${niche}")
-7. **engagementStrategy**: Specific strategy to boost engagement (comment prompts, share incentives, story polls, etc.)
-
-**Content Strategy by Week:**
-- Week 1 (Days 1-7): Introduction & Authority Building
-- Week 2 (Days 8-14): Value & Education
-- Week 3 (Days 15-21): Engagement & Community
-- Week 4 (Days 22-30): Growth & Viral Push
-
-**Rules:**
-- NO generic content like "share your journey" or "tips video"
-- Each idea must be SPECIFIC with exact topics, angles, or stories
-- Vary content formats throughout the month
-- Include trending formats and sounds references
-- Make hooks attention-grabbing and specific
-- Hashtags should be researched-quality, not generic
-
-Output strictly in structured JSON:
-{
-  "days": [
-    {
-      "day": 1,
-      "idea": "Specific detailed idea with exact angle",
-      "hook": "Exact words/visuals for first 3 seconds",
-      "format": "Detailed format specification",
-      "caption": "Full engaging caption with emojis and CTA",
-      "hashtags": ["hashtag1", "hashtag2", "...10-20 total"],
-      "postingTime": "Day Time Timezone - reason",
-      "engagementStrategy": "Specific engagement tactic"
-    }
-  ]
-}`;
+Return ONLY valid JSON array (no markdown, no code blocks):
+{"days":[{"day":1,"idea":"specific idea","hook":"attention hook","format":"content format","caption":"short caption","hashtags":["tag1","tag2","tag3","tag4","tag5"],"postingTime":"Day Time EST","engagementStrategy":"CTA tip"},{"day":2,...},...all 30 days]}`;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -159,33 +91,89 @@ Output strictly in structured JSON:
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    let content = data.choices?.[0]?.message?.content || "";
     
     console.log("AI Response received, parsing JSON...");
     
-    // Parse JSON from response
+    // Clean the response - remove markdown code blocks
+    content = content.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    
+    // Try to find JSON object in the response
     let result;
     try {
-      // Try to find JSON in the response
+      // First try direct parse
+      result = JSON.parse(content);
+    } catch (e1) {
+      console.log("Direct parse failed, trying to extract JSON...");
+      
+      // Try to find JSON object pattern
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        result = JSON.parse(jsonMatch[0]);
+        try {
+          // Try to fix incomplete JSON by closing arrays and objects
+          let jsonStr = jsonMatch[0];
+          
+          // Count open/close brackets
+          const openBrackets = (jsonStr.match(/\[/g) || []).length;
+          const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+          const openBraces = (jsonStr.match(/\{/g) || []).length;
+          const closeBraces = (jsonStr.match(/\}/g) || []).length;
+          
+          // If truncated, try to close it properly
+          if (openBrackets > closeBrackets || openBraces > closeBraces) {
+            console.log("JSON appears truncated, attempting to fix...");
+            
+            // Remove any trailing incomplete elements
+            jsonStr = jsonStr.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, '');
+            jsonStr = jsonStr.replace(/,\s*\{[^}]*$/, '');
+            jsonStr = jsonStr.replace(/,\s*"[^"]*$/, '');
+            
+            // Close arrays and objects
+            for (let i = 0; i < openBrackets - closeBrackets; i++) jsonStr += ']';
+            for (let i = 0; i < openBraces - closeBraces; i++) jsonStr += '}';
+          }
+          
+          result = JSON.parse(jsonStr);
+        } catch (e2) {
+          console.error("JSON extraction failed:", e2);
+          throw new Error("Failed to parse AI response");
+        }
       } else {
         throw new Error("No JSON found in response");
       }
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError);
-      console.log("Raw content:", content?.substring(0, 500));
-      return new Response(JSON.stringify({ 
-        error: "Failed to parse AI response. Please try again.",
-        rawContent: content?.substring(0, 1000)
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
-    console.log("Successfully generated content plan");
+    // Validate and normalize the result
+    if (regenerateDay !== null) {
+      // Single day response
+      if (!result.day) result.day = regenerateDay;
+      if (!result.hashtags) result.hashtags = [];
+      if (!Array.isArray(result.hashtags)) result.hashtags = [result.hashtags];
+    } else {
+      // Full 30-day response
+      if (!result.days) {
+        // Maybe it's just an array
+        if (Array.isArray(result)) {
+          result = { days: result };
+        } else {
+          throw new Error("Invalid response structure");
+        }
+      }
+      
+      // Normalize each day
+      result.days = result.days.map((day: any, index: number) => ({
+        day: day.day || index + 1,
+        idea: day.idea || "Content idea",
+        hook: day.hook || "Attention-grabbing hook",
+        format: day.format || contentType,
+        caption: day.caption || "",
+        hashtags: Array.isArray(day.hashtags) ? day.hashtags.slice(0, 10) : [],
+        postingTime: day.postingTime || "6 PM EST",
+        engagementStrategy: day.engagementStrategy || "Engage with comments"
+      }));
+    }
+
+    console.log(`Successfully parsed ${regenerateDay ? '1 day' : result.days?.length + ' days'}`);
     
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
