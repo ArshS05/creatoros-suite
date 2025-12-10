@@ -71,92 +71,90 @@ ${content.engagementStrategy}`;
 
   return (
     <div className={cn(
-      "bg-card border border-border rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:border-primary/30 group",
+      "bg-card border border-border rounded-2xl p-4 transition-all duration-300 hover:shadow-xl hover:border-primary/30 group flex flex-col h-full",
       isExpanded && "ring-2 ring-primary/20"
     )}>
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-bold text-lg shadow-lg">
-            {content.day}
-          </div>
-          <div className="flex-1">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Day {content.day}</p>
-            <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-              {content.idea}
-            </h3>
-          </div>
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-bold text-sm shadow-lg flex-shrink-0">
+          {content.day}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Day {content.day}</p>
+          <h3 className="font-semibold text-foreground text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors break-words">
+            {content.idea}
+          </h3>
         </div>
       </div>
 
       {/* Hook Preview */}
-      <div className="mb-4 p-3 bg-secondary/50 rounded-xl border border-border/50">
-        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
-          <Zap className="w-3 h-3" /> Hook
+      <div className="mb-3 p-2.5 bg-secondary/50 rounded-xl border border-border/50">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+          <Zap className="w-2.5 h-2.5" /> Hook
         </p>
-        <p className="text-sm text-foreground italic">"{content.hook}"</p>
+        <p className="text-xs text-foreground italic break-words line-clamp-2">"{content.hook}"</p>
       </div>
 
       {/* Quick Info */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <span className="px-3 py-1.5 bg-primary/10 text-primary text-xs font-medium rounded-lg">
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-medium rounded-md truncate max-w-[120px]">
           {content.format}
         </span>
-        <span className="px-3 py-1.5 bg-secondary text-muted-foreground text-xs font-medium rounded-lg flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          {content.postingTime.split(' ').slice(0, 2).join(' ')}
+        <span className="px-2 py-1 bg-secondary text-muted-foreground text-[10px] font-medium rounded-md flex items-center gap-1">
+          <Clock className="w-2.5 h-2.5 flex-shrink-0" />
+          <span className="truncate">{content.postingTime.split(' ').slice(0, 2).join(' ')}</span>
         </span>
       </div>
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="space-y-4 pt-4 border-t border-border animate-fade-in">
+        <div className="space-y-3 pt-3 border-t border-border animate-fade-in flex-1">
           {/* Caption */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                <MessageSquare className="w-3 h-3" /> Caption
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                <MessageSquare className="w-2.5 h-2.5" /> Caption
               </p>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs gap-1"
+                className="h-6 px-2 text-[10px] gap-1"
                 onClick={() => copyToClipboard(content.caption, 'Caption')}
               >
                 {copied === 'Caption' ? <CheckCircle2 className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                 Copy
               </Button>
             </div>
-            <p className="text-sm text-foreground bg-secondary/50 p-3 rounded-xl">
+            <p className="text-xs text-foreground bg-secondary/50 p-2.5 rounded-xl break-words">
               {content.caption}
             </p>
           </div>
 
           {/* Hashtags */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                <Hash className="w-3 h-3" /> Hashtags ({content.hashtags.length})
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                <Hash className="w-2.5 h-2.5" /> Hashtags ({content.hashtags.length})
               </p>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs gap-1"
+                className="h-6 px-2 text-[10px] gap-1"
                 onClick={() => copyToClipboard(content.hashtags.join(' '), 'Hashtags')}
               >
                 {copied === 'Hashtags' ? <CheckCircle2 className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                 Copy
               </Button>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {content.hashtags.slice(0, 15).map((tag, i) => (
-                <span key={i} className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
+            <div className="flex flex-wrap gap-1">
+              {content.hashtags.slice(0, 10).map((tag, i) => (
+                <span key={i} className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded break-all">
                   #{tag.replace('#', '')}
                 </span>
               ))}
-              {content.hashtags.length > 15 && (
-                <span className="px-2 py-1 bg-secondary text-muted-foreground text-xs rounded-md">
-                  +{content.hashtags.length - 15} more
+              {content.hashtags.length > 10 && (
+                <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground text-[10px] rounded">
+                  +{content.hashtags.length - 10}
                 </span>
               )}
             </div>
@@ -164,20 +162,20 @@ ${content.engagementStrategy}`;
 
           {/* Posting Time */}
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-              <Clock className="w-3 h-3" /> Best Posting Time
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5" /> Best Posting Time
             </p>
-            <p className="text-sm text-foreground bg-secondary/50 p-3 rounded-xl">
+            <p className="text-xs text-foreground bg-secondary/50 p-2.5 rounded-xl break-words">
               {content.postingTime}
             </p>
           </div>
 
           {/* Engagement Strategy */}
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-              <Zap className="w-3 h-3" /> Engagement Strategy
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
+              <Zap className="w-2.5 h-2.5" /> Engagement Strategy
             </p>
-            <p className="text-sm text-foreground bg-secondary/50 p-3 rounded-xl">
+            <p className="text-xs text-foreground bg-secondary/50 p-2.5 rounded-xl break-words">
               {content.engagementStrategy}
             </p>
           </div>
@@ -185,35 +183,35 @@ ${content.engagementStrategy}`;
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
+      <div className="flex items-center gap-2 mt-auto pt-3 border-t border-border">
         <Button
           variant="outline"
           size="sm"
-          className="flex-1 gap-1.5 rounded-xl"
+          className="flex-1 gap-1 rounded-xl text-xs h-8"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          {isExpanded ? "Collapse" : "View Details"}
+          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {isExpanded ? "Less" : "More"}
         </Button>
         <Button
           variant="outline"
           size="sm"
-          className="gap-1.5 rounded-xl"
+          className="rounded-xl h-8 w-8 p-0"
           onClick={copyFullContent}
         >
-          {copied === 'all' ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+          {copied === 'all' ? <CheckCircle2 className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
         </Button>
         <Button
           variant="outline"
           size="sm"
-          className="gap-1.5 rounded-xl"
+          className="rounded-xl h-8 w-8 p-0"
           onClick={() => onRegenerate(content.day)}
           disabled={isRegenerating}
         >
           {isRegenerating ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-3 h-3 animate-spin" />
           ) : (
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-3 h-3" />
           )}
         </Button>
       </div>

@@ -8,7 +8,8 @@ import {
   Award,
   X,
   Loader2,
-  Zap
+  Zap,
+  Calendar
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ export interface ContentSetupParams {
   audience: string;
   goal: string;
   experience: string;
+  numberOfDays: number;
 }
 
 const contentTypes = [
@@ -45,16 +47,19 @@ const contentGoals = [
 
 const experienceLevels = ["Beginner", "Intermediate", "Advanced"];
 
+const dayOptions = [7, 14, 21, 30];
+
 export function ContentSetupModal({ isOpen, onClose, onGenerate, isGenerating }: ContentSetupModalProps) {
   const [niche, setNiche] = useState("");
   const [contentType, setContentType] = useState("Mixed");
   const [audience, setAudience] = useState("");
   const [goal, setGoal] = useState("Growth");
   const [experience, setExperience] = useState("Intermediate");
+  const [numberOfDays, setNumberOfDays] = useState(14);
 
   const handleGenerate = async () => {
     if (!niche.trim()) return;
-    await onGenerate({ niche, contentType, audience, goal, experience });
+    await onGenerate({ niche, contentType, audience, goal, experience, numberOfDays });
   };
 
   if (!isOpen) return null;
@@ -70,7 +75,7 @@ export function ContentSetupModal({ isOpen, onClose, onGenerate, isGenerating }:
             </div>
             <div>
               <h2 className="text-2xl font-bold text-foreground">AI Content Calendar</h2>
-              <p className="text-muted-foreground">Generate a personalized 30-day content plan</p>
+              <p className="text-muted-foreground">Generate a personalized content plan</p>
             </div>
           </div>
           <button 
@@ -83,6 +88,32 @@ export function ContentSetupModal({ isOpen, onClose, onGenerate, isGenerating }:
         </div>
 
         <div className="space-y-6">
+          {/* Number of Days */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Calendar className="w-4 h-4 text-primary" />
+              How many days of content?
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {dayOptions.map((days) => (
+                <button
+                  key={days}
+                  onClick={() => setNumberOfDays(days)}
+                  className={cn(
+                    "py-4 px-4 rounded-xl text-center transition-all border-2",
+                    numberOfDays === days
+                      ? "bg-primary text-primary-foreground border-primary shadow-lg scale-[1.02]"
+                      : "bg-secondary hover:bg-secondary/80 text-foreground border-transparent hover:border-primary/30"
+                  )}
+                >
+                  <span className="text-2xl font-bold">{days}</span>
+                  <p className="text-xs mt-1 opacity-80">days</p>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">Choose based on your posting frequency</p>
+          </div>
+
           {/* Niche Input */}
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -211,12 +242,12 @@ export function ContentSetupModal({ isOpen, onClose, onGenerate, isGenerating }:
             {isGenerating ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Generating 30 Days...
+                Generating {numberOfDays} Days...
               </>
             ) : (
               <>
                 <Sparkles className="w-5 h-5" />
-                Generate 30-Day Plan
+                Generate {numberOfDays}-Day Plan
               </>
             )}
           </Button>

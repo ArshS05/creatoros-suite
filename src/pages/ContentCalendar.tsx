@@ -90,7 +90,7 @@ export default function ContentCalendar() {
 
         await loadSavedPlans();
         toast({ 
-          title: "30-Day Plan Generated!", 
+          title: `${params.numberOfDays}-Day Plan Generated!`, 
           description: `Created ${data.days.length} days of content for ${params.niche}` 
         });
         setShowGenerator(false);
